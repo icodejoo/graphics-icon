@@ -1,0 +1,66 @@
+{
+  "name": "vite-plugin-colorfont",
+  "version": "0.1.0",
+  "description": "Vite plugin to compile a folder of SVG icons into a color icon webfont (mono / COLRv0 / OT-SVG / COLRv1) with a tech() fallback @font-face, a typed virtual module, and stable codepoints. Pure JS, no node-gyp.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "webfont",
+    "icon-font",
+    "iconfont",
+    "svg",
+    "woff2",
+    "colr",
+    "colrv1",
+    "ot-svg",
+    "color-font"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/svg2colorfont.git",
+    "directory": "packages/vite-plugin"
+  },
+  "homepage": "https://github.com/icodejoo/svg2colorfont/tree/main/packages/vite-plugin#readme",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/copy-wasm.mjs",
+    "test": "node test/acceptance.ts && node test/plugin.test.ts",
+    "prepublishOnly": "pnpm build",
+    "pub": "pnpm build && npm version patch --no-git-tag-version && git -C ../.. add -A && git -C ../.. commit -m \"release: vite-plugin-colorfont\" && git -C ../.. push && pnpm publish --no-git-checks"
+  },
+  "dependencies": {
+    "cubic2quad": "^1.2.1",
+    "fflate": "^0.8.2",
+    "opentype.js": "^2.0.0",
+    "svgo": "^4.0.0",
+    "svgpath": "^2.6.0",
+    "ttf2woff": "^3.0.0",
+    "woff2-encoder": "^2.0.0"
+  },
+  "peerDependencies": {
+    "vite": "^5 || ^6 || ^7 || ^8"
+  },
+  "devDependencies": {
+    "@colorfont/core": "workspace:*",
+    "@types/node": "^24.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^8.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

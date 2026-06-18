@@ -1,0 +1,9 @@
+{
+  "name": "colorfont",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "smoke": "node packages/core/scripts/smoke.ts"
+  }
+}
