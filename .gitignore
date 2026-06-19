@@ -5,14 +5,25 @@ out/
 *.tmp/
 packages/*/dist/
 packages/*/pkg/
+packages/*/pkg-verify/
 **/target/
 .DS_Store
 *.tgz
 .tmp/
+
+# 统一测试产物输出目录(可由真实构建/脚本重建)
+demo-output/
+
+# 历史 / 临时产物
+**/.napi-out/
+**/.glyf-out*
+**/.tmp-sample*
 **/.smoke-out/
 **/.c1-*-out/
 **/.acc-*/
 **/.test-out*/
-**/.bench-icons/
 **/.bench-out/
 **/.demo/
+
+# 基准图标语料(本地生成,可由 bench 脚本重建)
+**/.bench-icons/

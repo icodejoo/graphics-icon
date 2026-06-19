@@ -29,7 +29,10 @@ export function resolveOptions(o: ColorfontOptions): ResolvedOptions {
     baseSelector: o.baseSelector ?? '.icon',
     classPrefix: o.classPrefix ?? 'icon-',
     colorFormat: o.colorFormat ?? 'auto',
-    formats: o.formats ?? ['woff2'],
+    // formats 显式给出则用之;否则由 woff 开关推导(woff2 始终产出)
+    formats: o.formats ?? (o.woff ? ['woff2', 'woff'] : ['woff2']),
+    colrv0: o.colrv0 ?? true,
+    threads: o.threads ?? 'auto',
     codepointsFile: o.codepointsFile
       ? resolve(o.codepointsFile)
       : resolve(outDir, 'codepoints.json'),

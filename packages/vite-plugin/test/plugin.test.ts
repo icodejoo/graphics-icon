@@ -58,8 +58,9 @@ const baseOpts = {
   // 从 dev CSS 模块里取一个字体 URL
   const cssMod = p.load!.call({} as never, '\0virtual:colorfont.css') as string
   assert(cssMod.includes('/@colorfont/'), 'dev 模式字体 URL 走 /@colorfont/')
-  const m = cssMod.match(/\/@colorfont\/([^"'?)]+\.woff2)/)
-  assert(m, '能从 dev CSS 提取一个 woff2 字体路径')
+  // dev 极速档:dev 跳过 q11 woff2,改产 woff(~84ms)→ dev CSS 引用 .woff
+  const m = cssMod.match(/\/@colorfont\/([^"'?)]+\.woff)(?!2)/)
+  assert(m, '能从 dev CSS 提取一个 woff 字体路径(dev 极速档)')
   const fontPath = '/@colorfont/' + m![1]
 
   // mock dev server
@@ -97,7 +98,7 @@ const baseOpts = {
   middleware!({ url: fontPath }, res, () => (nextCalled = true))
   assert(!nextCalled, '字体请求被中间件处理(未 next)')
   assert(res.body && res.body.length > 100, '中间件返回非空字体字节')
-  assert(res.headers['Content-Type'] === 'font/woff2', 'Content-Type 为 font/woff2')
+  assert(res.headers['Content-Type'] === 'font/woff', 'Content-Type 为 font/woff(dev 极速档)')
 
   // 非字体请求应 next
   let passed = false

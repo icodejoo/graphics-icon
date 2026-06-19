@@ -56,8 +56,17 @@ export interface ColorfontOptions {
   classPrefix?: string
   /** 颜色策略,默认 'auto'。 */
   colorFormat?: ColorFormat
-  /** 输出容器,默认 ['woff2']。 */
+  /** 输出容器,默认 ['woff2']。显式给出则覆盖 woff 开关。 */
   formats?: FontFormat[]
+  /** 是否额外产出 .woff(woff2 兼容性已很好,默认 false 只产 woff2)。开启后 CSS 的 src 会带上 woff。 */
+  woff?: boolean
+  /**
+   * 是否生成 COLRv0 档(平涂彩色,面向不支持 COLRv1 的老环境)。默认 true。
+   * 若只面向现代浏览器(COLRv1 覆盖 Chrome/Edge/FF、OT-SVG 覆盖 Safari),可设 false 省一档。
+   */
+  colrv0?: boolean
+  /** 多线程:每档字体一个 worker 并行构建(主攻 woff2 编码,占总耗时约 67%)。默认 'auto'(图标 ≥200 时启用)。 */
+  threads?: boolean | 'auto'
   /** 码位锁文件路径,默认 `<outDir>/codepoints.json`。建议 commit。 */
   codepointsFile?: string
   /** PUA 起始码位,默认 0xE000。 */
@@ -76,6 +85,9 @@ export interface ResolvedOptions {
   classPrefix: string
   colorFormat: ColorFormat
   formats: FontFormat[]
+  /** 是否生成 COLRv0 档。 */
+  colrv0: boolean
+  threads: boolean | 'auto'
   codepointsFile: string
   paStart: number
 }

@@ -5,5 +5,11 @@
   "packageManager": "pnpm@10.24.0",
   "scripts": {
     "smoke": "node packages/core/scripts/smoke.ts"
+  },
+  "devDependencies": {
+    "@0x6b/ttf2woff2-wasm": "^0.13.1",
+    "scale-that-svg": "^1.0.6",
+    "svg2ttf": "^6.1.0",
+    "svgicons2svgfont": "^16.0.0"
   }
 }

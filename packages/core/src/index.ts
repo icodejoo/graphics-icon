@@ -1,48 +1,25 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { buildFlavors } from './parallel.ts'
 import { assignCodepoints, readLockfile, writeLockfile } from './codepoints/lockfile.ts'
 import { emitCss as emitCssImpl } from './emit/emit-css.ts'
 import { emitDts } from './emit/emit-dts.ts'
-import { toWoff } from './encode/to-woff.ts'
-import { toWoff2 } from './encode/to-woff2.ts'
-import { buildColrv0Font } from './flavors/build-colrv0.ts'
-import { buildGlyfFont } from './flavors/build-glyf.ts'
-import { buildOtsvgFont } from './flavors/build-otsvg.ts'
 import { resolveOptions } from './options.ts'
-import { detectColor } from './pipeline/detect-color.ts'
 import { loadIcons } from './pipeline/load-icons.ts'
-import { normalizeSvg } from './pipeline/normalize-svg.ts'
-import { toOutline } from './outline/to-outline.ts'
-import { contentHash } from './util/hash.ts'
-import { getSvgInner, parseSvg } from './util/svg.ts'
+import { prepareIcons } from './pipeline/prepare-icons.ts'
 
-import type { ColorPlan } from './pipeline/detect-color.ts'
 import type {
   BuildResult,
   BuildWarning,
   ColorFormat,
   ColorfontOptions,
-  FontAsset,
   FontFlavor,
-  FontFormat,
-  GlyphDef,
   GlyphMeta,
-  ResolvedOptions,
 } from './types.ts'
-import type { ViewBox } from './util/svg.ts'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
-}
-
-interface ParsedIcon {
-  name: string
-  codepoint: number
-  viewBox: ViewBox
-  plan: ColorPlan
-  /** 规范化 SVG 内层内容,供 OT-SVG 包装。 */
-  inner: string
 }
 
 /** 由 colorFormat + 是否存在彩色图标,推导要产出的 flavor 集合(mono 永远产出)。 */
@@ -76,20 +53,6 @@ function resolveFlavors(cf: ColorFormat, anyColor: boolean): { flavors: FontFlav
   return { flavors, warnings }
 }
 
-async function encodeFont(
-  ttf: Uint8Array,
-  format: FontFormat,
-  color: FontFlavor,
-  o: ResolvedOptions,
-): Promise<FontAsset> {
-  let source: Uint8Array
-  if (format === 'ttf') source = ttf
-  else if (format === 'woff2') source = await toWoff2(ttf)
-  else source = toWoff(ttf)
-  const hash = contentHash(source)
-  return { fileName: `${o.fontName}.${color}.${hash}.${format}`, source, color, format, hash }
-}
-
 /** 纯函数:输入图标 + 选项 → 产物 Buffer + 元数据 + CSS/TS 生成器。不落盘。 */
 export async function build(options: ColorfontOptions): Promise<BuildResult> {
   const o = resolveOptions(options)
@@ -102,100 +65,48 @@ export async function build(options: ColorfontOptions): Promise<BuildResult> {
     today(),
   )
 
-  const parsed: ParsedIcon[] = icons.map((icon) => {
-    const norm = normalizeSvg(icon.svg)
-    const { viewBox, paths } = parseSvg(norm)
-    return {
-      name: icon.name,
-      codepoint: cpMap[icon.name],
-      viewBox,
-      plan: detectColor(paths),
-      inner: getSvgInner(norm),
-    }
-  })
+  // useThreads 提前:预处理池与各档构建都用它('auto' 在图标 ≥200 时启用)
+  const useThreads = o.threads === true || (o.threads === 'auto' && icons.length >= 200)
 
-  const isColor = (p: ParsedIcon) => p.plan.multicolor || p.plan.hasGradient
-  const anyColor = parsed.some(isColor)
+  // per-icon 预处理(svgo 规范化 + 解析 + 颜色检测 + base/层轮廓),worker 池并行(线程数=CPU 一半)
+  const prepared = await prepareIcons(
+    icons.map((icon) => ({ name: icon.name, svg: icon.svg, codepoint: cpMap[icon.name] })),
+    o,
+    useThreads,
+  )
+
+  const anyColor = prepared.some((p) => p.needsColor)
   const { flavors, warnings } = resolveFlavors(o.colorFormat, anyColor)
-
-  const assets: FontAsset[] = []
-
-  // mono(永远产出)
-  const monoGlyphs: GlyphDef[] = parsed.map((p) => {
-    const { path, advanceWidth } = toOutline(p.plan.allDs, p.viewBox, o)
-    return { name: p.name, codepoint: p.codepoint, advanceWidth, path }
-  })
-  const monoTtf = buildGlyfFont(monoGlyphs, o)
-  for (const format of o.formats) assets.push(await encodeFont(monoTtf, format, 'mono', o))
-
-  // colrv0(存在彩色需求时)
-  if (flavors.includes('colrv0')) {
-    const { ttf } = buildColrv0Font(
-      parsed.map((p) => ({
-        name: p.name,
-        codepoint: p.codepoint,
-        viewBox: p.viewBox,
-        allDs: p.plan.allDs,
-        layers: p.plan.layers,
-        multicolor: p.plan.multicolor,
-      })),
-      o,
-    )
-    for (const format of o.formats) assets.push(await encodeFont(ttf, format, 'colrv0', o))
+  // colrv0 开关:关闭则不产 COLRv0 档(只面向支持 COLRv1+OT-SVG 的现代浏览器)
+  if (!o.colrv0) {
+    const i = flavors.indexOf('colrv0')
+    if (i >= 0) flavors.splice(i, 1)
   }
 
-  // otsvg(存在彩色需求时;多色或渐变图标嵌入 OT-SVG 文档)
-  if (flavors.includes('otsvg')) {
-    const ttf = buildOtsvgFont(
-      parsed.map((p) => ({
-        name: p.name,
-        codepoint: p.codepoint,
-        viewBox: p.viewBox,
-        allDs: p.plan.allDs,
-        innerSvg: p.inner,
-        needsColor: isColor(p),
-      })),
-      o,
-    )
-    for (const format of o.formats) assets.push(await encodeFont(ttf, format, 'otsvg', o))
-  }
-
-  // colrv1(opt-in:仅 colorFormat==='colrv1';经 Rust/wasm 写表后端,未构建则警告并跳过)
+  // 决定要构建的档:mono 永远;colrv0/otsvg 视彩色与开关;colrv1 仅显式且 wasm 可用
+  const toBuild: FontFlavor[] = ['mono']
+  if (flavors.includes('colrv0')) toBuild.push('colrv0')
+  if (flavors.includes('otsvg')) toBuild.push('otsvg')
   if (o.colorFormat === 'colrv1' && anyColor) {
-    const { addColrv1, isColrv1Available } = await import('./colrv1/wasm-writer.ts')
-    if (await isColrv1Available()) {
-      const { buildColrv1 } = await import('./colrv1/build-colrv1.ts')
-      const { baseSfnt, doc } = buildColrv1(
-        parsed.map((p) => ({
-          name: p.name,
-          codepoint: p.codepoint,
-          viewBox: p.viewBox,
-          allDs: p.plan.allDs,
-          layers: p.plan.layers,
-          inner: p.inner,
-          needsColor: isColor(p),
-        })),
-        o,
-      )
-      const ttf = await addColrv1(baseSfnt, doc)
-      for (const format of o.formats) assets.push(await encodeFont(ttf, format, 'colrv1', o))
-      if (!flavors.includes('colrv1')) flavors.unshift('colrv1')
-    } else {
+    const { isColrv1Available } = await import('./colrv1/wasm-writer.ts')
+    if (await isColrv1Available()) toBuild.push('colrv1')
+    else
       warnings.push({
         code: 'COLRV1_WASM_MISSING',
         level: 'warn',
         message:
-          'colrv1-writer wasm 未构建,colrv1 档已跳过(仍产出 colrv0+otsvg)。装 Rust 后在 packages/colrv1-writer 跑 `wasm-pack build --target nodejs` 即启用。',
+          'colrv1-writer wasm 未构建,colrv1 档已跳过(仍产出 colrv0+otsvg)。装 Rust 后在 packages/colrv1-writer 跑 wasm-pack build 即启用。',
       })
-    }
   }
 
-  const glyphsMeta: GlyphMeta[] = parsed.map((p) => ({
+  const assets = await buildFlavors(toBuild, prepared, o, useThreads)
+
+  const glyphsMeta: GlyphMeta[] = prepared.map((p) => ({
     name: p.name,
     codepoint: p.codepoint,
     unicode: String.fromCodePoint(p.codepoint),
-    color: isColor(p),
-    flavors: [...flavors],
+    color: p.needsColor,
+    flavors: [...toBuild],
   }))
 
   const metadata = {

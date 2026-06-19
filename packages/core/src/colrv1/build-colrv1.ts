@@ -1,29 +1,25 @@
-import { assembleFont, buildBaseGlyphs, layerGlyph } from '../flavors/font-assembly.ts'
-import { toOutline } from '../outline/to-outline.ts'
+// COLRv1 前端:把图标拆层 → 造 base 字体(glyf 底座)→ 解析可靠 gid → 构造 paint 树 doc,
+// 交给 Rust/wasm 写表后端(wasm-writer.addColrv1)追加 COLR/CPAL。
+//
+// 本次重写只换两件事(其余 paint/渐变/颜色逻辑与 doc 结构保持不变,以匹配未重编的 wasm):
+//   ① base SFNT 来源:opentype.js + font-assembly(CFF) → 已验证的 buildColorGlyf(...).ttf(glyf 字节)。
+//   ② glyph 引用 gid:opentype 的 glyphs.length/baseIndexByName → buildColorGlyf 解析出的 baseGid/layers[i].gid。
+// bbox(渐变坐标映射用)从 toOutline 的新返回值 { bbox } 获取(旧 path.getBoundingBox() 已失效)。
+
+import { buildColorGlyf } from '../glyf/color-glyphs.ts'
 import { toRgba } from '../util/color.ts'
 
 import { gradientIdFromFill, parseGradients } from './parse-gradients.ts'
 import { FOREGROUND } from './paint.ts'
 
-import type { ColorLayer } from '../pipeline/detect-color.ts'
+import type { PreparedIcon } from '../pipeline/prepare-core.ts'
 import type { ResolvedOptions } from '../types.ts'
 import type { ViewBox } from '../util/svg.ts'
 import type { Gradient } from './parse-gradients.ts'
 import type { ColorGlyph, ColorStop, Colrv1Doc, ColrLayer, Paint, Pt } from './paint.ts'
 
-export interface Colrv1IconInput {
-  name: string
-  codepoint: number
-  viewBox: ViewBox
-  allDs: string[]
-  layers: ColorLayer[]
-  /** 规范化 SVG 内层(含渐变 defs)。 */
-  inner: string
-  needsColor: boolean
-}
-
 export interface Colrv1Build {
-  /** 仅含 glyf 的 base 字体(notdef + base 字形 + 层字形),供 wasm 注入 COLR/CPAL。 */
+  /** 仅含 glyf 的 base 字体(notdef + 层字形 + base 字形),供 wasm 注入 COLR/CPAL。 */
   baseSfnt: Uint8Array
   doc: Colrv1Doc
 }
@@ -96,7 +92,7 @@ function gradientPaint(g: Gradient, viewBox: ViewBox, bbox: BBox, pal: Palette, 
   return { kind: 'radial', c0, r0: 0, c1, r1, stops, extend: g.spread }
 }
 
-function layerPaint(layer: ColorLayer, gradients: Map<string, Gradient>, viewBox: ViewBox, bbox: BBox, pal: Palette, o: ResolvedOptions): Paint {
+function layerPaint(layer: { fill: string; color: string }, gradients: Map<string, Gradient>, viewBox: ViewBox, bbox: BBox, pal: Palette, o: ResolvedOptions): Paint {
   const gid = gradientIdFromFill(layer.fill)
   if (gid && gradients.has(gid)) {
     return gradientPaint(gradients.get(gid)!, viewBox, bbox, pal, o)
@@ -110,29 +106,35 @@ function layerPaint(layer: ColorLayer, gradients: Map<string, Gradient>, viewBox
 
 /**
  * 构建 COLRv1 的 base 字体(glyf)+ paint 树文档。
- * 字形顺序:notdef → 各图标 base(带 unicode)→ 各 color 图标的层字形(无 unicode)。
+ *
+ * base/gid 来源:buildColorGlyf 已把每个图标的 base 轮廓 + 各层轮廓组装进一个 glyf 字体,
+ * 并解析好 baseGid(经 cmap)与每层 gid(经 glyph-name,含去重 canonical)。其 ttf 即交给
+ * wasm 的 base SFNT(glyf 字节,头 4 字节 0,1,0,0);doc 里的 glyph 引用直接用它解析出的 gid。
  */
-export function buildColrv1(icons: Colrv1IconInput[], o: ResolvedOptions): Colrv1Build {
+export function buildColrv1(icons: PreparedIcon[], o: ResolvedOptions): Colrv1Build {
   const pal = new Palette()
-  const { glyphs, baseIndexByName } = buildBaseGlyphs(icons, o)
 
+  // ① base 字体 + gid:用已验证的 glyf 底座一次性组装并解析(直接吃预计算的 PreparedIcon)。
+  const { ttf, icons: resolved } = buildColorGlyf(icons, o)
+  const resolvedByName = new Map(resolved.map((r) => [r.name, r]))
+
+  // ② paint 树:逐彩色图标构造 ColorGlyph。gid / 层 bbox 全来自预计算解析结果,不再 toOutline。
   const colorGlyphs: ColorGlyph[] = []
   for (const ic of icons) {
     if (!ic.needsColor) continue
+    const res = resolvedByName.get(ic.name)
+    if (!res) continue
+
     const gradients = parseGradients(ic.inner)
-    const layers: ColrLayer[] = []
-    ic.layers.forEach((layer, i) => {
-      const out = toOutline([layer.d], ic.viewBox, o)
-      const bb = out.path.getBoundingBox() as BBox
-      const gid = glyphs.length
-      glyphs.push(layerGlyph(`${ic.name}.l${i}`, out.advanceWidth, out.path))
-      layers.push({ glyphId: gid, paint: layerPaint(layer, gradients, ic.viewBox, bb, pal, o) })
-    })
-    colorGlyphs.push({ baseGlyphId: baseIndexByName.get(ic.name)!, layers })
+    const layers: ColrLayer[] = res.layers.map((rl) => ({
+      glyphId: rl.gid,
+      paint: layerPaint(rl, gradients, ic.viewBox, rl.bbox, pal, o),
+    }))
+    colorGlyphs.push({ baseGlyphId: res.baseGid, layers })
   }
 
   return {
-    baseSfnt: new Uint8Array(assembleFont(glyphs, o).toArrayBuffer()),
+    baseSfnt: ttf,
     doc: { unitsPerEm: o.unitsPerEm, palette: pal.colors, colorGlyphs },
   }
 }

@@ -1,5 +1,7 @@
 import { build as coreBuild } from '@colorfont/core'
 
+import { buildGalleryHtml } from './gallery.ts'
+
 import type { BuildResult, FontAsset, VitePluginColorfontOptions } from '@colorfont/core'
 
 /** dev 期字体中间件挂载前缀。 */
@@ -49,7 +51,14 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
   let base = '/'
 
   const regenerate = async () => {
-    result = await coreBuild(options)
+    // dev/serve 极速档:跳过 q11 woff2(每档 ~1.2s),只产 woff(~84ms)→ dev/HMR 近乎瞬时;
+    // 生产 build 仍按用户 formats(默认 woff2)产出最小体积。可用 devFast:false 关闭。
+    if (!isBuild && (options as { devFast?: boolean }).devFast !== false) {
+      const formats = (options.formats ?? ['woff2']).filter((f) => f !== 'woff2')
+      result = await coreBuild({ ...options, formats: formats.length ? formats : ['woff'] })
+    } else {
+      result = await coreBuild(options)
+    }
   }
 
   const fontUrl = (a: FontAsset) =>
@@ -135,6 +144,14 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
       if (!result) return
       for (const a of result.assets) {
         this.emitFile({ type: 'asset', fileName: `colorfont/${a.fileName}`, source: a.source })
+      }
+      // emitDemo:额外产出独立 CSS + 类型化 API + 自包含画廊(file:// 直接打开、可复制)
+      if ((options as { emitDemo?: boolean }).emitDemo) {
+        const enc = new TextEncoder()
+        const css = result.emitCss((a) => `./${a.fileName}`)
+        this.emitFile({ type: 'asset', fileName: `colorfont/${options.fontName}.css`, source: enc.encode(css) })
+        this.emitFile({ type: 'asset', fileName: `colorfont/${options.fontName}.ts`, source: enc.encode(result.dts) })
+        this.emitFile({ type: 'asset', fileName: `colorfont/index.html`, source: enc.encode(buildGalleryHtml(result, options)) })
       }
     },
   }

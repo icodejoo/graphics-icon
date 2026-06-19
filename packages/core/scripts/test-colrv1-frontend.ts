@@ -5,12 +5,8 @@ import opentype from 'opentype.js'
 
 import { buildColrv1 } from '../src/colrv1/build-colrv1.ts'
 import { resolveOptions } from '../src/options.ts'
-import { detectColor } from '../src/pipeline/detect-color.ts'
 import { loadIcons } from '../src/pipeline/load-icons.ts'
-import { normalizeSvg } from '../src/pipeline/normalize-svg.ts'
-import { getSvgInner, parseSvg } from '../src/util/svg.ts'
-
-import type { Colrv1IconInput } from '../src/colrv1/build-colrv1.ts'
+import { prepareOne } from '../src/pipeline/prepare-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const fixtures = resolve(here, '../fixtures')
@@ -22,29 +18,15 @@ function assert(cond: unknown, msg: string): asserts cond {
 const o = resolveOptions({ input: fixtures, outDir: resolve(here, '../.c1-out'), fontName: 'C1', colorFormat: 'colrv1', formats: ['woff2'] })
 const icons = await loadIcons(o.input)
 
-const inputs: Colrv1IconInput[] = icons.map((ic, i) => {
-  const norm = normalizeSvg(ic.svg)
-  const { viewBox, paths } = parseSvg(norm)
-  const plan = detectColor(paths)
-  return {
-    name: ic.name,
-    codepoint: 0xe000 + i,
-    viewBox,
-    allDs: plan.allDs,
-    layers: plan.layers,
-    inner: getSvgInner(norm),
-    needsColor: plan.multicolor || plan.hasGradient,
-  }
-})
+const inputs = icons.map((ic, i) => prepareOne({ name: ic.name, svg: ic.svg, codepoint: 0xe000 + i }, o))
 
 const { baseSfnt, doc } = buildColrv1(inputs, o)
 
-// 名称 → baseGlyphId(用于在 doc 里定位)
+// 解析 base 字体;名称 → baseGlyphId 经 cmap(码位 0xE000+i)取真实 gid。
+// 注意:glyf 引擎「层字形优先 + svg2ttf 去重」使 gid 不再是输入顺序的 1..5,必须经 cmap 解析。
+const font = opentype.parse(baseSfnt.buffer.slice(baseSfnt.byteOffset, baseSfnt.byteOffset + baseSfnt.byteLength))
 const baseIdByName = new Map<string, number>()
-{
-  let gid = 1
-  for (const ic of inputs) baseIdByName.set(ic.name, gid++)
-}
+inputs.forEach((ic, i) => baseIdByName.set(ic.name, font.charToGlyphIndex(String.fromCodePoint(0xe000 + i))))
 
 console.log('=== COLRv1 frontend ===')
 console.log('palette:', doc.palette.join(', '))
@@ -88,21 +70,23 @@ if (paint.kind === 'linear') {
 assert(doc.palette.includes('#e53935') && doc.palette.includes('#1e88e5'), 'palette 含 logo 红/蓝')
 assert(doc.palette.includes('#ffb300') && doc.palette.includes('#f4511e'), 'palette 含 badge 渐变两色')
 
-// base SFNT:可解析,字形数 = 1 notdef + 5 base + 3 层(logo2 + badge1)= 9,base 有 unicode、层无
-const font = opentype.parse(baseSfnt.buffer.slice(baseSfnt.byteOffset, baseSfnt.byteOffset + baseSfnt.byteLength))
+// base SFNT 布局(glyf 引擎:层字形优先 + svg2ttf 去重 → 比 CFF 更紧凑):
+//  - 5 个码位都必须映射到有效 gid(cmap 完整);
+//  - doc 里所有层 glyphId 必须有效且共 3 个(logo2 + badge1);
+//  - 因去重(层轮廓 == base silhouette 时合并为同一 gid),字形总数可能 < 9,
+//    且某个 .l 层字形可能借合并带上 base 的 unicode —— 均为正确行为(渲染无碍)。
 console.log('base SFNT glyphs:', font.glyphs.length)
-assert(font.glyphs.length === 9, `base 字形数应 9,实为 ${font.glyphs.length}`)
-let withUnicode = 0
-let layerGlyphs = 0
-for (let i = 0; i < font.glyphs.length; i++) {
-  const g = font.glyphs.get(i)
-  if (g.unicode) withUnicode++
-  if (/\.l\d+$/.test(g.name)) {
-    layerGlyphs++
-    assert(!g.unicode, `层字形 ${g.name} 不应有 unicode`)
+for (let i = 0; i < inputs.length; i++) {
+  const gid = font.charToGlyphIndex(String.fromCodePoint(0xe000 + i))
+  assert(gid > 0, `${inputs[i].name}(U+${(0xe000 + i).toString(16)})应映射到有效 gid`)
+}
+let layerRefs = 0
+for (const cg of doc.colorGlyphs) {
+  for (const ly of cg.layers) {
+    assert(ly.glyphId > 0 && ly.glyphId < font.glyphs.length, `层 glyphId ${ly.glyphId} 应有效`)
+    layerRefs++
   }
 }
-assert(withUnicode === 5, `应 5 个带 unicode 的 base 字形,实为 ${withUnicode}`)
-assert(layerGlyphs === 3, `应 3 个层字形,实为 ${layerGlyphs}`)
+assert(layerRefs === 3, `colorGlyphs 应共引用 3 个层(logo2 + badge1),实为 ${layerRefs}`)
 
 console.log('\n✅ COLRv1 FRONTEND OK (paint 树 + 渐变 p2 垂直 + 调色板 + base SFNT 布局)')

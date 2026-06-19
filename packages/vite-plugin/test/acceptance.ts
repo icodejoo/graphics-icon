@@ -91,14 +91,15 @@ try {
   assert(api && api.code.includes('iconClass'), 'dev 下虚拟 API 模块导出 iconClass')
 
   // 经真实中间件 + HTTP 取字体字节
-  const m = transformed!.code.match(/\/@colorfont\/([^"'?\\]+\.woff2)/)
-  assert(m, '能从 dev CSS 提取 woff2 路径')
+  // dev 极速档:dev 跳过 q11 woff2,改产 woff(~84ms)→ dev CSS/中间件走 .woff
+  const m = transformed!.code.match(/\/@colorfont\/([^"'?\\]+\.woff)(?!2)/)
+  assert(m, '能从 dev CSS 提取 woff 路径(dev 极速档)')
   const res = await fetch(`http://localhost:${port}/@colorfont/${m![1]}`)
   assert(res.status === 200, `字体 HTTP 200(实为 ${res.status})`)
-  assert(res.headers.get('content-type') === 'font/woff2', 'Content-Type=font/woff2')
+  assert(res.headers.get('content-type') === 'font/woff', 'Content-Type=font/woff')
   const bytes = new Uint8Array(await res.arrayBuffer())
-  assert(bytes.length > 100 && String.fromCharCode(...bytes.slice(0, 4)) === 'wOF2', 'dev 返回有效 woff2')
-  console.log(`[dev] ✓ 真实 server :${port} 经中间件返回 ${m![1]} (${bytes.length} B, wOF2)`)
+  assert(bytes.length > 100 && String.fromCharCode(...bytes.slice(0, 4)) === 'wOFF', 'dev 返回有效 woff')
+  console.log(`[dev] ✓ 真实 server :${port} 经中间件返回 ${m![1]} (${bytes.length} B, wOFF)`)
 } finally {
   await server.close()
 }
