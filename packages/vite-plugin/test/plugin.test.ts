@@ -1,10 +1,10 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import colorfont from '../src/index.ts'
+import colorfont from '../src/colorfont-plugin.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const fixtures = resolve(here, '../../core/fixtures')
+const fixtures = resolve(here, '../../colorfont/fixtures')
 const tmpOut = resolve(here, '../.test-out')
 
 function assert(cond: unknown, msg: string): asserts cond {

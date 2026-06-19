@@ -1,0 +1,8 @@
+{
+  "name": "colrv1-writer",
+  "version": "0.0.0",
+  "type": "commonjs",
+  "main": "colrv1_writer.js",
+  "types": "colrv1_writer.d.ts",
+  "files": ["colrv1_writer.js", "colrv1_writer_bg.wasm", "colrv1_writer.d.ts", "colrv1_writer_bg.wasm.d.ts"]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "svg-icons",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Vite plugin that builds SVG sprite sheets (<symbol> + <use href>) on top of vite-plugin-icons-spritesheet, adding per-symbol id scoping (fixes cross-icon id collisions), color rewriting (currentColor/theming), an auto-generated typed script entry (iconsHref + iconsName + IconName), a shared on-disk cache, and an opt-in normalize/scale step that reuses colorfont's normalizeSvg algorithm.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/svg2colorfont.git",
+    "directory": "packages/svg-icons"
+  },
+  "keywords": [
+    "vite-plugin",
+    "svg-icons",
+    "svg-symbol",
+    "sprite",
+    "icons",
+    "use-href"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@codejoo/utils": "workspace:*",
+    "vite-plugin-icons-spritesheet": "catalog:",
+    "svgo": "catalog:",
+    "svgpath": "catalog:",
+    "scale-that-svg": "catalog:"
+  },
+  "peerDependencies": {
+    "vite": "^5 || ^6 || ^7 || ^8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vite": "catalog:",
+    "tsup": "^8.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup"
+  }
+}

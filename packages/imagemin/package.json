@@ -1,0 +1,54 @@
+{
+  "name": "@codejoo/imagemin",
+  "private": true,
+  "version": "0.0.0",
+  "description": "On-demand image-compression engine + CLI (sharp for bitmaps, svgo for vectors) with a content-hash cache that survives renames/moves. Heavy deps are dynamically imported so the API loads instantly; lossy rewrites are written back in place only when smaller.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/svg2colorfont.git",
+    "directory": "packages/imagemin"
+  },
+  "keywords": [
+    "image-optimization",
+    "image-compression",
+    "imagemin",
+    "sharp",
+    "svgo",
+    "webp",
+    "avif",
+    "png",
+    "jpeg",
+    "cli"
+  ],
+  "bin": {
+    "codejoo-imagemin": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@codejoo/utils": "workspace:*",
+    "sharp": "catalog:",
+    "svgo": "catalog:",
+    "svgpath": "catalog:",
+    "scale-that-svg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "tsup": "^8.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup"
+  }
+}

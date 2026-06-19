@@ -1,6 +1,7 @@
 // 生成自包含的图标画廊 index.html(内联 @font-face + 图标类 + 搜索 + 点击复制)。
 // 字体以 ./<file> 相对引用(与 index.html 同目录),可直接用浏览器打开预览。
-import type { BuildResult, VitePluginColorfontOptions } from '@colorfont/core'
+import type { BuildResult } from '@codejoo/colorfont'
+import type { VitePluginColorfontOptions } from './colorfont-plugin.ts'
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

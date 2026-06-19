@@ -12,7 +12,7 @@ packages/*/pkg-verify/
 .tmp/
 
 # 统一测试产物输出目录(可由真实构建/脚本重建)
-demo-output/
+**/demo-output/
 
 # 历史 / 临时产物
 **/.napi-out/

@@ -1,0 +1,53 @@
+{
+  "name": "@codejoo/colorfont",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Engine that compiles a folder of SVG icons into a color icon webfont (mono / COLRv0 / OT-SVG / COLRv1) with a tech() fallback @font-face and stable codepoints. Pure JS, no node-gyp. Consumed as source by vite-plugin-graphics-icon.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/svg2colorfont.git",
+    "directory": "packages/colorfont"
+  },
+  "bin": {
+    "colorfont": "./dist/cli/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/cli.d.ts",
+      "import": "./dist/cli/cli.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "smoke": "node scripts/smoke.ts",
+    "test": "node test/cli.test.ts",
+    "build": "tsup && node scripts/copy-wasm.mjs"
+  },
+  "dependencies": {
+    "@codejoo/utils": "workspace:*",
+    "cubic2quad": "^1.2.1",
+    "opentype.js": "^2.0.0",
+    "svg2ttf": "^6.1.0",
+    "svgo": "catalog:",
+    "svgpath": "catalog:",
+    "scale-that-svg": "catalog:",
+    "ttf2woff": "^3.0.0"
+  },
+  "devDependencies": {
+    "@0x6b/ttf2woff2-wasm": "^0.13.1",
+    "@types/node": "^24.0.0",
+    "svgicons2svgfont": "^16.0.0",
+    "typescript": "^5.6.0",
+    "tsup": "^8.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}

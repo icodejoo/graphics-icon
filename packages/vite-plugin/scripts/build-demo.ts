@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import { build as viteBuild } from 'vite'
 
-import colorfont from '../src/index.ts'
+import colorfont from '../src/colorfont-plugin.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, '../../..') // colorfont 仓库根

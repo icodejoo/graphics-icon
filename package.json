@@ -1,15 +1,38 @@
 {
-  "name": "colorfont",
+  "name": "@codejoo/graphics-to-font",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.24.0",
-  "scripts": {
-    "smoke": "node packages/core/scripts/smoke.ts"
-  },
-  "devDependencies": {
-    "@0x6b/ttf2woff2-wasm": "^0.13.1",
-    "scale-that-svg": "^1.0.6",
-    "svg2ttf": "^6.1.0",
-    "svgicons2svgfont": "^16.0.0"
-  }
+  "description": "High-performance, full-featured graphics build toolkit (pnpm monorepo): SVG icons -> color webfont (colorfont), bitmap sprite sheets, image compression (imagemin), and SVG symbol sprites - sharing one utils submodule, one cache folder, and on-demand modular loading.",
+  "keywords": [
+    "graphics",
+    "build-tool",
+    "vite-plugin",
+    "monorepo",
+    "performance",
+    "tree-shakeable",
+    "webfont",
+    "icon-font",
+    "iconfont",
+    "color-font",
+    "colr",
+    "colrv1",
+    "ot-svg",
+    "svg-to-font",
+    "sprite-sheet",
+    "spritesheet",
+    "bitmap-sprite",
+    "image-atlas",
+    "maxrects",
+    "sharp",
+    "webp",
+    "avif",
+    "image-optimization",
+    "image-compression",
+    "imagemin",
+    "svgo",
+    "svg-sprite",
+    "svg-symbol",
+    "build-cache"
+  ]
 }

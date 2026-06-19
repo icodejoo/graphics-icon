@@ -1,2 +1,16 @@
 packages:
   - 'packages/*'
+
+# 共享公用依赖版本(catalog):各子包以 "catalog:" 引用,统一升级、避免版本漂移。
+# Shared common dependency versions: packages reference them via "catalog:" for single-point upgrades.
+catalog:
+  # 通用 / common
+  svgo: ^4.0.0
+  svgpath: ^2.6.0
+  scale-that-svg: ^1.0.6
+  vite: ^8.0.0
+  # 位图 / bitmap (bitmap-sprite, imagemin)
+  sharp: ^0.35.1
+  maxrects-packer: ^2.7.3
+  # svg sprite
+  vite-plugin-icons-spritesheet: ^3.1.0

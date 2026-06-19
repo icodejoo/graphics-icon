@@ -1,21 +1,23 @@
 {
-  "name": "vite-plugin-colorfont",
+  "name": "vite-plugin-graphics-icon",
   "version": "0.1.0",
-  "description": "Vite plugin to compile a folder of SVG icons into a color icon webfont (mono / COLRv0 / OT-SVG / COLRv1) with a tech() fallback @font-face, a typed virtual module, and stable codepoints. Pure JS, no node-gyp.",
   "type": "module",
   "license": "MIT",
+  "description": "Umbrella Vite plugin composing colorfont color-webfont + bitmap sprite sheets + SVG symbol sprites + imagemin, with one shared cache dir and on-demand loading.",
   "keywords": [
-    "vite",
     "vite-plugin",
+    "graphics",
+    "icons",
     "webfont",
-    "icon-font",
-    "iconfont",
-    "svg",
-    "woff2",
-    "colr",
-    "colrv1",
-    "ot-svg",
-    "color-font"
+    "colorfont",
+    "color-font",
+    "sprite-sheet",
+    "svg-sprite",
+    "svg-symbol",
+    "imagemin",
+    "image-optimization",
+    "sharp",
+    "svgo"
   ],
   "repository": {
     "type": "git",
@@ -31,6 +33,12 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "graphics-icon-imagemin": "./dist/bin.js",
+    "graphics-icon-bitmap": "./dist/bin-bitmap.js",
+    "graphics-icon-svg": "./dist/bin-svg.js",
+    "graphics-icon-colorfont": "./dist/bin-colorfont.js"
+  },
   "files": [
     "dist",
     "README.md"
@@ -39,26 +47,33 @@
     "build": "tsup && node scripts/copy-wasm.mjs",
     "test": "node test/acceptance.ts && node test/plugin.test.ts",
     "prepublishOnly": "pnpm build",
-    "pub": "pnpm build && npm version patch --no-git-tag-version && git -C ../.. add -A && git -C ../.. commit -m \"release: vite-plugin-colorfont\" && git -C ../.. push && pnpm publish --no-git-checks"
+    "pub": "pnpm build && npm version patch --no-git-tag-version && git -C ../.. add -A && git -C ../.. commit -m \"release: vite-plugin-graphics-icon\" && git -C ../.. push && pnpm publish --no-git-checks"
   },
   "dependencies": {
     "cubic2quad": "^1.2.1",
-    "fflate": "^0.8.2",
     "opentype.js": "^2.0.0",
     "svg2ttf": "^6.1.0",
-    "svgo": "^4.0.0",
-    "svgpath": "^2.6.0",
-    "ttf2woff": "^3.0.0"
+    "ttf2woff": "^3.0.0",
+    "svgo": "catalog:",
+    "svgpath": "catalog:",
+    "scale-that-svg": "catalog:",
+    "sharp": "catalog:",
+    "maxrects-packer": "catalog:",
+    "vite-plugin-icons-spritesheet": "catalog:"
   },
   "peerDependencies": {
     "vite": "^5 || ^6 || ^7 || ^8"
   },
   "devDependencies": {
-    "@colorfont/core": "workspace:*",
-    "@types/node": "^24.0.0",
+    "@codejoo/colorfont": "workspace:*",
+    "bitmap-icons": "workspace:*",
+    "svg-icons": "workspace:*",
+    "@codejoo/imagemin": "workspace:*",
+    "@codejoo/utils": "workspace:*",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0",
-    "vite": "^8.0.0"
+    "@types/node": "^24.0.0",
+    "vite": "catalog:"
   },
   "publishConfig": {
     "access": "public"

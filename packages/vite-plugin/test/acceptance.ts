@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url'
 
 import { build as viteBuild, createServer } from 'vite'
 
-import colorfont from '../src/index.ts'
+import colorfont from '../src/colorfont-plugin.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(here, 'app')
-const coreFixtures = resolve(here, '../../core/fixtures')
+const coreFixtures = resolve(here, '../../colorfont/fixtures')
 const distDir = resolve(here, '.acc-dist')
 const tmpOut = resolve(here, '.acc-tmp')
 

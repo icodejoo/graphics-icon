@@ -29,5 +29,5 @@ function copyPkg(pkgDir, outDir, mainJs, label, essential) {
   console.log(`[copy-wasm] ${label}: 拷贝 ${n} 个文件 → dist/${label}`)
 }
 
-copyPkg(resolve(here, '../../woff2-wasm/pkg'), resolve(here, '../dist/woff2'), 'woff2_writer.js', 'woff2', true)
-copyPkg(resolve(here, '../../colrv1-writer/pkg'), resolve(here, '../dist/colrv1'), 'colrv1_writer.js', 'colrv1', false)
+copyPkg(resolve(here, '../../colorfont/woff2-wasm/pkg'), resolve(here, '../dist/woff2'), 'woff2_writer.js', 'woff2', true)
+copyPkg(resolve(here, '../../colorfont/colrv1-writer/pkg'), resolve(here, '../dist/colrv1'), 'colrv1_writer.js', 'colrv1', false)

@@ -7,11 +7,11 @@ import { fileURLToPath } from 'node:url'
 
 import { build as viteBuild } from 'vite'
 
-import colorfont from '../dist/index.js'
+import graphicsIcon from '../dist/index.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(here, 'app')
-const coreFixtures = resolve(here, '../../core/fixtures')
+const coreFixtures = resolve(here, '../../colorfont/fixtures')
 const distDir = resolve(here, '.acc-dist-pub')
 const tmpOut = resolve(here, '.acc-tmp-pub')
 
@@ -40,12 +40,15 @@ await viteBuild({
   build: { outDir: distDir, emptyOutDir: true },
   // 用已构建的发布插件(default 导出),开 colrv1(应触发相对 wasm 加载)
   plugins: [
-    colorfont({
-      input: coreFixtures,
-      outDir: tmpOut,
-      fontName: 'PubIcons',
-      colorFormat: 'colrv1',
-      formats: ['woff2'],
+    // graphicsIcon 现返回单个 Vite 插件(不再是数组),直接作为一个 plugin 用。
+    graphicsIcon({
+      colorfont: {
+        input: coreFixtures,
+        outDir: tmpOut,
+        fontName: 'PubIcons',
+        colorFormat: 'colrv1',
+        formats: ['woff2'],
+      },
     }),
   ],
 })
