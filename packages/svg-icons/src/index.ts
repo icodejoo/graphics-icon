@@ -42,4 +42,4 @@ export { svgIcons } from "./create.ts"
 export { generateSvgSprites } from "./create.ts"
 export { runCli } from "./bin.ts"
 
-export type { SvgIconsOptions, SvgIconsConfig, SvgIconsOutput, ColorOption, ColorFn, NormalizeOption } from "./types.ts"
+export type { SvgIconsOptions, SvgIconsCommon, SvgIconsItem, SvgIconsConfig, SvgIconsOutput, ColorOption, ColorFn, NormalizeOption } from "./types.ts"

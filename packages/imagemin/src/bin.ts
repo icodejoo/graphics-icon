@@ -73,8 +73,8 @@ async function loadOptions(configPath?: string): Promise<ImageminOptions> {
 }
 
 /**
- * 运行 CLI。可被其他包(如 vite-plugin-graphics-icon 的 bin)直接调用以「完全平替」本 CLI。
- * Run the CLI. Exported so other packages (e.g. vite-plugin-graphics-icon's bin) can reuse it verbatim.
+ * 运行 CLI。可被其他包(如 graphics-icon 的 bin)直接调用以「完全平替」本 CLI。
+ * Run the CLI. Exported so other packages (e.g. graphics-icon's bin) can reuse it verbatim.
  */
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   // --all / --scan：全量扫描模式。可选附带目录：--all public src/assets（缺省扫描整个仓库根）。

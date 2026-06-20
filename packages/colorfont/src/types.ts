@@ -36,13 +36,11 @@ export interface CodepointMap {
   glyphs: Record<string, CodepointEntry>
 }
 
-export interface ColorfontOptions {
-  /** 图标源目录(.svg)。 */
-  input: string | string[]
-  /** 产物输出目录。 */
-  outDir: string
-  /** OpenType family / @font-face font-family。 */
-  fontName: string
+/**
+ * 各实例可共享的「公共参数」(顶层设置;每个 item 与之合并,item 同名字段覆盖)。
+ * Shared "common" params (set at top level; merged into each item, item overrides).
+ */
+export interface ColorfontCommon {
   /** CSS font-family(默认同 fontName)。 */
   fontFamily?: string
   /** em 方格,默认 1000。 */
@@ -60,24 +58,45 @@ export interface ColorfontOptions {
   formats?: FontFormat[]
   /** woff2 的 brotli 压缩质量 1..=11。默认 11(生产最高压缩);dev 自动用 9(快 ~30×,体积仅 +6%)。 */
   woff2Quality?: number
-  /**
-   * 是否生成 COLRv0 档(平涂彩色,面向不支持 COLRv1 的老环境)。默认 true。
-   * 若只面向现代浏览器(COLRv1 覆盖 Chrome/Edge/FF、OT-SVG 覆盖 Safari),可设 false 省一档。
-   */
+  /** 是否生成 COLRv0 档(平涂彩色,面向不支持 COLRv1 的老环境)。默认 true。 */
   colrv0?: boolean
-  /** 多线程:per-icon 预处理用 worker 池(线程数 = CPU 一半,封顶 8)+ 每档一 worker。默认 'auto'(图标 ≥200 时启用)。 */
+  /** 多线程:per-icon 预处理用 worker 池 + 每档一 worker。默认 'auto'(图标 ≥200 时启用)。 */
   threads?: boolean | 'auto'
-  /**
-   * 构建缓存:图标 + 影响产物的选项 + 码位不变时,跳过整条管线(svgo/svg2ttf/woff2)直接复用上次字体产物,
-   * 加速重启 / HMR / CI。默认开启,缓存在 `node_modules/.cache/colorfont`。
-   * 传 `false` 关闭;传 `{ dir }` 自定义目录(指向仓库内即可随源码提交、团队共享,类似 imagemin)。
-   */
-  cache?: boolean | { dir?: string }
-  /** 码位锁文件路径,默认 `<outDir>/codepoints.json`。建议 commit。 */
-  codepointsFile?: string
   /** PUA 起始码位,默认 0xE000。 */
   paStart?: number
+  /** 是否启用缓存(默认 true);false → 删除该实例缓存与旧产物并强制重建。 / Enable cache (default true). */
+  cache?: boolean
+  /** 出错是否抛出并中止(默认 true);false → 仅告警并继续。 / Throw & abort on error (default true). */
+  throwable?: boolean
 }
+
+/** 单字体实例配置(公共参数 + 本实例专属)。 / One font instance (common + instance-only). */
+export interface ColorfontItem extends ColorfontCommon {
+  /** 图标源目录(.svg)。 */
+  input: string | string[]
+  /** 产物输出目录(字体 + .css + .ts 实物落盘于此)。 */
+  outDir: string
+  /** OpenType family / @font-face font-family。 */
+  fontName: string
+  /** 码位锁文件路径,默认 `<outDir>/<fontName>.codepoints.json`。建议 commit。 */
+  codepointsFile?: string
+  /**
+   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名。省略 → 由 fontName 派生唯一默认名。
+   * vite 插件模式请用 `cacheName`(仅名字,目录由系统管理)。
+   */
+  cacheFilename?: string
+}
+
+/**
+ * 引擎/插件入参:公共参数 + `items[]`。每个实例 = { ...公共, ...本项 }(本项覆盖公共)。
+ * Options: common params + `items[]`. Each instance = { ...common, ...item } (item wins).
+ */
+export interface ColorfontOptions extends ColorfontCommon {
+  items: ColorfontItem[]
+}
+
+/** @deprecated 旧名,等价于单实例 ColorfontItem(过渡用)。 / Old alias for the single ColorfontItem. */
+export type ColorfontEngineOptions = ColorfontItem
 
 export interface ResolvedOptions {
   input: string[]
@@ -96,8 +115,8 @@ export interface ResolvedOptions {
   /** woff2 brotli 质量 1..=11。 */
   woff2Quality: number
   threads: boolean | 'auto'
-  /** 构建缓存目录;false 表示关闭。 */
-  cache: { dir: string } | false
+  /** 是否启用缓存(groupCache 由 buildAndWrite 持有;build 本身为纯函数无缓存)。 */
+  cache: boolean
   codepointsFile: string
   paStart: number
 }

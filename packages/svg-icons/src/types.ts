@@ -56,37 +56,49 @@ export interface SvgIconsOutput {
   script?: string
 }
 
-export interface SvgIconsConfig {
-  /** 图标源目录 / icon source directory */
-  input: string
-  /** 产物路径集合（svg 必填，script 可选） / output paths (svg required, script optional) */
-  output: SvgIconsOutput
+/**
+ * 各实例可共享的「公共参数」(顶层设置;每个 item 与之合并,item 同名字段覆盖)。
+ * Shared "common" params (set at top level; merged into each item, item overrides).
+ */
+export interface SvgIconsCommon {
   /** 颜色改写策略（见 ColorOption） / color rewrite strategy */
   color?: ColorOption
   /**
    * 归一化 / 缩放（默认关闭）。开启后每个 symbol 几何被缩放到统一 viewBox 宽度（默认 1024），
    * 与 colorfont 的 normalizeSvg 同步。见 NormalizeOption。
-   * Normalize / scale (default off). When on, each symbol geometry is scaled to a uniform viewBox
-   * width (default 1024), in sync with colorfont's normalizeSvg. See NormalizeOption.
    */
   normalize?: NormalizeOption
   /** symbol id 转换；默认保留原文件名（维持现有 <use href="#xxx">） */
   iconNameTransformer?: (name: string) => string
   /** 生成后的格式化器（svg 不支持时插件会优雅回退） */
   formatter?: "svgo" | "prettier" | "oxfmt"
+  /** 是否启用缓存（默认 true）；false → 删除该实例缓存与旧产物并强制重建。 / Enable cache (default true). */
+  cache?: boolean
+  /** 出错是否抛出并中止（默认 true）；false → 仅告警并继续。 / Throw & abort on error (default true). */
+  throwable?: boolean
+}
+
+/** 单实例配置（公共参数 + 本实例专属）。 / One instance config (common + instance-only fields). */
+export interface SvgIconsItem extends SvgIconsCommon {
+  /** 图标源目录 / icon source directory */
+  input: string
+  /** 产物路径集合（svg 必填，script 可选） / output paths (svg required, script optional) */
+  output: SvgIconsOutput
+  /**
+   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名（裸名 → 落共享目录 .cache.graphics/）。
+   * 省略 → 由输出名派生唯一默认名。vite 插件模式请用 `cacheName`（仅名字,目录由系统管理）。
+   * Standalone cache file (full path or bare name). Omit → unique default from the output name.
+   */
+  cacheFilename?: string
 }
 
 /**
- * 插件入参(对象式)：
- *   · sprites    —— 各实例配置（一个或多个雪碧图）
- *   · cacheFile  —— 插件级缓存文件路径（整个插件只设一次，非实例级）。
- *                   省略则落共享缓存目录 .cache.graphics/svg-icons.json（随仓库提交→团队共享）。
- * Plugin options (object form):
- *   · sprites    — per-instance configs (one or more sprites)
- *   · cacheFile  — plugin-level cache file path (set once, not per instance).
- *                  Omitted → shared cache folder .cache.graphics/svg-icons.json (commit it → team-shared).
+ * 插件/引擎入参:公共参数 + `items[]`。每个实例 = { ...公共, ...本项 }（本项覆盖公共）。
+ * Options: common params + `items[]`. Each instance = { ...common, ...item } (item wins).
  */
-export interface SvgIconsOptions {
-  sprites: SvgIconsConfig[]
-  cacheFile?: string
+export interface SvgIconsOptions extends SvgIconsCommon {
+  items: SvgIconsItem[]
 }
+
+/** @deprecated 旧名,等价于 SvgIconsItem(过渡用)。 / Old alias for SvgIconsItem. */
+export type SvgIconsConfig = SvgIconsItem

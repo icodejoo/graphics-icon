@@ -28,7 +28,7 @@ import { existsSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { extname, relative } from "node:path"
 
-import { resolveCacheFile, loadCache, saveCache } from "@codejoo/utils/cache"
+import { resolveCacheFile, openPerFileCache } from "@codejoo/utils/cache"
 import { matchesAnyGlob, toGlobList } from "@codejoo/utils/glob"
 import { sha256 } from "@codejoo/utils/hash"
 import { scaleSvgToWidth } from "@codejoo/utils/scale-svg"
@@ -59,6 +59,13 @@ export interface ImageminOptions {
   logStats?: boolean
   /** 同时处理的图片数（并发）。默认 8 以平衡速度与内存 */
   concurrency?: number
+  /**
+   * 出错时是否抛出并中止流程（默认 true）。
+   *   · true  → 任一图失败即抛错中止（vite/closeBundle 走 vite 报错；CLI 非零退出 → 阻断提交）。
+   *   · false → 仅 console.warn 告警并继续（成功项照常落盘+缓存，失败项下次重试）。
+   * Throw & abort on error (default true); false → warn & continue.
+   */
+  throwable?: boolean
 
   // ── 位图：以下均为对应底层依赖的「完整」选项对象，直接透传 ──
   /** sharp 构造参数（animated / failOn / limitInputPixels / density / pages …） */
@@ -120,8 +127,21 @@ export interface OptimizeResult {
   cacheFile: string
 }
 
-/** 相对路径 -> 压缩后内容的 hash */
-type HashStore = Record<string, string>
+// imagemin 缓存版本:改判定/产出逻辑时 +1。
+const IMAGEMIN_CACHE_VERSION = "imagemin-v2"
+
+/**
+ * 影响产物的压缩参数指纹(并入 configHash)。参数变(如 webp q80→q60)→ 整表作废、全部按新参数重压。
+ * include/exclude/cacheFile/logStats/concurrency 不影响产物,故不计入。函数(如 svgSize)按 toString 序列化。
+ */
+function imageminConfigHash(o: ImageminOptions): string {
+  const sig = {
+    v: IMAGEMIN_CACHE_VERSION,
+    png: o.png, jpeg: o.jpeg, jpg: o.jpg, webp: o.webp, avif: o.avif, tiff: o.tiff, gif: o.gif,
+    svg: o.svg, svgSize: o.svgSize, resize: o.resize, sharpOptions: o.sharpOptions, keepMetadata: o.keepMetadata, rotate: o.rotate,
+  }
+  return sha256(JSON.stringify(sig, (_k, v) => (typeof v === "function" ? `fn:${v.toString()}` : v)))
+}
 
 const kib = (n: number): string => `${(n / 1024).toFixed(2)} KiB`
 
@@ -210,24 +230,13 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
 }
 
 export async function optimizeImages(files: string[], options: ImageminOptions): Promise<OptimizeResult> {
-  // 缓存文件：可选；省略时落共享目录 .cache.graphics/imagemin.json
+  // 缓存文件：可选；省略时落共享目录 .cache.graphics/imagemin.json。
+  // 统一逐文件缓存(含反查表):路径命中→skip;内容指纹命中(改名/移动/复制)→moved(迁移 key);否则 process。
+  // configHash 并入压缩参数:参数变 → 整表作废、全部按新参数重压。
   const cacheFile = resolveCacheFile("imagemin", options.cacheFile)
+  const cache = openPerFileCache(cacheFile, imageminConfigHash(options))
 
-  const old = loadCache(cacheFile) as HashStore // 正向表：相对路径 → 最终成品 hash
-  const temp: HashStore = {}
-
-  // 反查表：最终成品 hash → 相对路径。用于识别被移动/重命名/复制的文件——
-  // 新路径不在正向表里，但其内容 hash 命中反查表，说明内容是旧成品，无需重压。
-  const reverse = new Map<string, string>()
-  for (const [path, hash] of Object.entries(old)) reverse.set(hash, path)
-
-  // 删除：剪枝磁盘上已不存在的条目（含删除的图、重命名前的旧路径）→ 其 key 就此移除
-  for (const [path, hash] of Object.entries(old)) {
-    if (existsSync(path)) temp[path] = hash
-  }
-
-  // 只处理"存在 & 命中 include glob & 未命中 exclude glob"的文件；删除项（清单里但磁盘已无）
-  // 在此被滤掉，其缓存 key 已由上面的剪枝移除，故无需进入压缩循环。
+  // 只处理"存在 & 命中 include glob & 未命中 exclude glob"的文件；删除项由 openPerFileCache 内部按 existsSync 剪枝。
   const include = toGlobList(options.include)
   const exclude = toGlobList(options.exclude)
   const targets = files.filter((f) => {
@@ -241,21 +250,9 @@ export async function optimizeImages(files: string[], options: ImageminOptions):
     const rel = toRel(file)
     try {
       const buf = await readFile(file)
-      const hash = sha256(buf)
-
-      // ── 逐文件判定（优先看路径，再看内容 hash）──
-      if (rel in old) {
-        // 路径在缓存：① hash 一致 → 未变，跳过；② 不一致 → 内容已改(modified)，下方压缩
-        if (old[rel] === hash) {
-          temp[rel] = hash
-          return { file: rel, skipped: true, changed: false, before: buf.length, after: buf.length }
-        }
-      } else if (reverse.has(hash)) {
-        // 路径不在缓存，但内容指纹命中 → 重命名/移动/复制：仅把 key 迁到新路径，不重压
-        temp[rel] = hash
-        return { file: rel, skipped: true, moved: true, changed: false, before: buf.length, after: buf.length }
-      }
-      // 其余：路径不在缓存且指纹未命中 = 新增；或路径在缓存但内容已改 = 修改 → 压缩
+      const action = cache.decide(rel, sha256(buf))
+      if (action === "skip") return { file: rel, skipped: true, changed: false, before: buf.length, after: buf.length }
+      if (action === "moved") return { file: rel, skipped: true, moved: true, changed: false, before: buf.length, after: buf.length }
 
       const ext = extname(file).slice(1).toLowerCase()
       const out = await compress(buf, ext, options, rel)
@@ -267,21 +264,30 @@ export async function optimizeImages(files: string[], options: ImageminOptions):
       if (out && out.data.length > 0 && !out.data.equals(buf) && (out.force || out.data.length < buf.length)) {
         finalBuf = out.data
         // 以 Uint8Array 视图写出:规避 @types/node 24 中 Buffer<ArrayBufferLike> 与 NonSharedBuffer 的类型摩擦。
-        // Write as a Uint8Array view to sidestep @types/node 24's Buffer<ArrayBufferLike> vs NonSharedBuffer friction.
         await writeFile(file, new Uint8Array(finalBuf.buffer, finalBuf.byteOffset, finalBuf.byteLength))
       }
 
-      temp[rel] = sha256(finalBuf) // 存"磁盘最终内容"的 hash
+      cache.record(rel, sha256(finalBuf)) // 记录"磁盘最终内容"的 hash
       return { file: rel, skipped: false, changed: finalBuf !== buf, before: buf.length, after: finalBuf.length }
     } catch (err) {
-      // 单张图失败不阻断提交：不写缓存 → 下次自动重试
+      // 失败不 record 该文件 → 不入缓存,下次重试;错误收集后批末强制抛出。
       return { file: rel, skipped: false, changed: false, before: 0, after: 0, error: String((err as Error)?.message ?? err) }
     }
   })
 
-  saveCache(cacheFile, temp)
+  cache.save() // 成功项(已 record)写入缓存;失败项未 record → 不入缓存
 
   if (options.logStats) printStats(results)
+
+  // 错误处理由 throwOnError 开关控制(默认 true):成功项已落盘 + 缓存;失败项未入缓存、下次重试。
+  //   · true  → 抛出汇总(vite/closeBundle 走 vite 报错;CLI 非零退出 → 阻断提交)。
+  //   · false → 仅 console.warn 告警并继续。
+  const failed = results.filter((r) => r.error)
+  if (failed.length > 0) {
+    const msg = `[imagemin] ${failed.length}/${targets.length} 张处理失败:\n${failed.map((r) => `  · ${r.file}: ${r.error}`).join("\n")}`
+    if (options.throwable === false) console.warn(msg)
+    else throw new Error(msg) // 默认 true:抛错中止
+  }
 
   return {
     results,

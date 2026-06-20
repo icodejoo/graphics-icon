@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 
 import { build, buildAndWrite, readLockfile, serializeLockfile } from '../index.ts'
 
-import type { ColorfontOptions, ColorFormat, FontFormat } from '../index.ts'
+import type { ColorfontItem, ColorFormat, FontFormat } from '../index.ts'
 
 const USAGE = `colorfont — SVG 图标 → 彩色 webfont
 
@@ -52,17 +52,17 @@ function str(v: string | true | undefined): string | undefined {
   return typeof v === 'string' ? v : undefined
 }
 
-async function optionsFromFlags(flags: Flags): Promise<ColorfontOptions> {
-  let base: Partial<ColorfontOptions> = {}
+async function optionsFromFlags(flags: Flags): Promise<ColorfontItem> {
+  let base: Partial<ColorfontItem> = {}
   const config = str(flags.config)
   if (config) {
     const mod = await import(pathToFileURL(resolve(config)).href)
-    base = (mod.default ?? mod) as Partial<ColorfontOptions>
+    base = (mod.default ?? mod) as Partial<ColorfontItem>
   }
   const input = str(flags.input)
-  const merged: ColorfontOptions = {
+  const merged: ColorfontItem = {
     ...base,
-    input: input ? input.split(',') : (base.input as ColorfontOptions['input']),
+    input: input ? input.split(',') : (base.input as ColorfontItem['input']),
     outDir: str(flags.out) ?? (base.outDir as string),
     fontName: str(flags.name) ?? (base.fontName as string),
   }
@@ -75,7 +75,7 @@ async function optionsFromFlags(flags: Flags): Promise<ColorfontOptions> {
   return merged
 }
 
-function requireOpts(o: ColorfontOptions): string | null {
+function requireOpts(o: ColorfontItem): string | null {
   if (!o.input) return '缺少 --input'
   if (!o.outDir) return '缺少 --out'
   if (!o.fontName) return '缺少 --name'
@@ -122,13 +122,17 @@ export async function run(argv: string[], log: Log = console.log): Promise<numbe
 
   if (cmd === 'build') {
     const result = await buildAndWrite(options)
-    summarize('build 完成', result.assets, log)
-    for (const w of result.warnings) log(`[colorfont] 警告: ${w.message}`)
+    if (result === null) {
+      log('[colorfont] 命中缓存,产物已最新')
+    } else {
+      summarize('build 完成', result.assets, log)
+      for (const w of result.warnings) log(`[colorfont] 警告: ${w.message}`)
+    }
     return 0
   }
 
   if (cmd === 'check') {
-    const cpFile = options.codepointsFile ?? resolve(options.outDir, 'codepoints.json')
+    const cpFile = options.codepointsFile ?? resolve(options.outDir, `${options.fontName}.codepoints.json`)
     const before = await readMaybe(resolve(cpFile))
     const result = await build(options) // 不落盘
     const after = serializeLockfile(result.codepoints)
@@ -149,8 +153,8 @@ export async function run(argv: string[], log: Log = console.log): Promise<numbe
 
   // watch
   const { watch } = await import('node:fs')
-  const result = await buildAndWrite(options)
-  summarize('watch 初次构建', result.assets, log)
+  const first = await buildAndWrite(options)
+  if (first) summarize('watch 初次构建', first.assets, log)
   const dirs = Array.isArray(options.input) ? options.input : [options.input]
   let timer: ReturnType<typeof setTimeout> | undefined
   for (const dir of dirs) {
@@ -159,7 +163,8 @@ export async function run(argv: string[], log: Log = console.log): Promise<numbe
       clearTimeout(timer)
       timer = setTimeout(async () => {
         const r = await buildAndWrite(options)
-        summarize(`重建(${file})`, r.assets, log)
+        if (r) summarize(`重建(${file})`, r.assets, log)
+        else log(`[colorfont] 命中缓存(${file})`)
       }, 80)
     })
   }

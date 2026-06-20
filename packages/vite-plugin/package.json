@@ -1,81 +1,33 @@
 {
-  "name": "vite-plugin-graphics-icon",
+  "name": "@graphics-icon/vite-umbrella",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Umbrella Vite plugin composing colorfont color-webfont + bitmap sprite sheets + SVG symbol sprites + imagemin, with one shared cache dir and on-demand loading.",
-  "keywords": [
-    "vite-plugin",
-    "graphics",
-    "icons",
-    "webfont",
-    "colorfont",
-    "color-font",
-    "sprite-sheet",
-    "svg-sprite",
-    "svg-symbol",
-    "imagemin",
-    "image-optimization",
-    "sharp",
-    "svgo"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/icodejoo/svg2colorfont.git",
-    "directory": "packages/vite-plugin"
-  },
-  "homepage": "https://github.com/icodejoo/svg2colorfont/tree/main/packages/vite-plugin#readme",
+  "private": true,
+  "description": "Internal: the umbrella Vite plugin (graphicsIcon) composing colorfont/svg/bitmap/imagemin. Published surface is `graphics-icon` (packages/exports), which re-exports this at graphics-icon/vite.",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "graphics-icon-imagemin": "./dist/bin.js",
-    "graphics-icon-bitmap": "./dist/bin-bitmap.js",
-    "graphics-icon-svg": "./dist/bin-svg.js",
-    "graphics-icon-colorfont": "./dist/bin-colorfont.js"
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "scripts": {
-    "build": "tsup && node scripts/copy-wasm.mjs",
-    "test": "node test/acceptance.ts && node test/plugin.test.ts",
-    "prepublishOnly": "pnpm build",
-    "pub": "pnpm build && npm version patch --no-git-tag-version && git -C ../.. add -A && git -C ../.. commit -m \"release: vite-plugin-graphics-icon\" && git -C ../.. push && pnpm publish --no-git-checks"
-  },
   "dependencies": {
-    "cubic2quad": "^1.2.1",
-    "opentype.js": "^2.0.0",
-    "svg2ttf": "^6.1.0",
-    "ttf2woff": "^3.0.0",
-    "svgo": "catalog:",
-    "svgpath": "catalog:",
-    "scale-that-svg": "catalog:",
-    "sharp": "catalog:",
-    "maxrects-packer": "catalog:",
-    "vite-plugin-icons-spritesheet": "catalog:"
+    "@codejoo/colorfont": "workspace:*",
+    "bitmap-icons": "workspace:*",
+    "svg-icons": "workspace:*",
+    "@codejoo/imagemin": "workspace:*"
   },
   "peerDependencies": {
     "vite": "^5 || ^6 || ^7 || ^8"
   },
-  "devDependencies": {
-    "@codejoo/colorfont": "workspace:*",
-    "bitmap-icons": "workspace:*",
-    "svg-icons": "workspace:*",
-    "@codejoo/imagemin": "workspace:*",
-    "@codejoo/utils": "workspace:*",
-    "tsup": "^8.0.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^24.0.0",
-    "vite": "catalog:"
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
-  "publishConfig": {
-    "access": "public"
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vite": "catalog:"
   }
 }

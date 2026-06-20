@@ -1,10 +1,11 @@
+import { globSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-import { writeBufferIfChanged, writeTextIfChanged } from '@codejoo/utils/fs-write'
+import { groupCache, resolveCacheFile } from '@codejoo/utils/cache'
+import { sha256 } from '@codejoo/utils/hash'
 
 import { buildFlavors } from './parallel.ts'
-import { computeCacheKey, readCache, writeCache } from './cache/build-cache.ts'
 import { assignCodepoints, readLockfile, writeLockfile } from './codepoints/lockfile.ts'
 import { emitCss as emitCssImpl } from './emit/emit-css.ts'
 import { emitDts } from './emit/emit-dts.ts'
@@ -16,10 +17,13 @@ import type {
   BuildResult,
   BuildWarning,
   ColorFormat,
+  ColorfontItem,
   ColorfontOptions,
   FontFlavor,
   GlyphMeta,
+  ResolvedOptions,
 } from './types.ts'
+import type { GroupInput } from '@codejoo/utils/cache'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -56,8 +60,8 @@ function resolveFlavors(cf: ColorFormat, anyColor: boolean): { flavors: FontFlav
   return { flavors, warnings }
 }
 
-/** 纯函数:输入图标 + 选项 → 产物 Buffer + 元数据 + CSS/TS 生成器。不落盘。 */
-export async function build(options: ColorfontOptions): Promise<BuildResult> {
+/** 纯函数:输入图标 + 选项 → 产物 Buffer + 元数据 + CSS/TS 生成器。不落盘、无缓存(缓存在 buildAndWrite)。 */
+export async function build(options: ColorfontItem): Promise<BuildResult> {
   const o = resolveOptions(options)
   const icons = await loadIcons(o.input)
 
@@ -67,13 +71,6 @@ export async function build(options: ColorfontOptions): Promise<BuildResult> {
     lock,
     today(),
   )
-
-  // 构建缓存:输入图标 + 影响产物的选项 + 码位不变 → 命中则跳过整条管线,直接复用上次字体产物
-  const cacheKey = o.cache ? computeCacheKey(icons.map((i) => ({ name: i.name, svg: i.svg })), cpMap, o) : ''
-  if (o.cache) {
-    const hit = readCache(o.cache.dir, cacheKey)
-    if (hit) return { ...hit, emitCss: (resolveUrl) => emitCssImpl(hit.assets, hit.metadata, o, resolveUrl) }
-  }
 
   // useThreads 提前:预处理池与各档构建都用它('auto' 在图标 ≥200 时启用)
   const useThreads = o.threads === true || (o.threads === 'auto' && icons.length >= 200)
@@ -127,8 +124,6 @@ export async function build(options: ColorfontOptions): Promise<BuildResult> {
   }
 
   const dts = emitDts(metadata, o)
-  // 写入构建缓存(失败静默,不影响构建)
-  if (o.cache) writeCache(o.cache.dir, cacheKey, { assets, metadata, dts, codepoints: lock, warnings })
 
   return {
     assets,
@@ -140,31 +135,116 @@ export async function build(options: ColorfontOptions): Promise<BuildResult> {
   }
 }
 
-/** 便捷版:build 后把字体 / CSS / TS 入口 / 码位锁写到 outDir。 */
-export async function buildAndWrite(options: ColorfontOptions): Promise<BuildResult> {
-  const o = resolveOptions(options)
-  const result = await build(options)
+// 引擎缓存版本:改产物格式 / 缓存模型时 +1。
+const COLORFONT_CACHE_VERSION = 'colorfont-cache-v2'
 
-  await mkdir(o.outDir, { recursive: true })
-  // 幂等写入(复用 @codejoo/utils/fs-write,与 svg-icons/bitmap-icons 同源):内容未变则跳过,
-  // 避免无谓改 mtime / git 噪声 / 构建抖动 / HMR 循环。
-  for (const asset of result.assets) {
-    writeBufferIfChanged(join(o.outDir, asset.fileName), asset.source)
+/** 影响产物的配置指纹(不含图标内容,那在 groupCache.files 里)。 */
+function configHashOf(o: ResolvedOptions): string {
+  return sha256(
+    JSON.stringify({
+      v: COLORFONT_CACHE_VERSION,
+      fontName: o.fontName,
+      fontFamily: o.fontFamily,
+      unitsPerEm: o.unitsPerEm,
+      ascender: o.ascender,
+      descender: o.descender,
+      baseSelector: o.baseSelector,
+      classPrefix: o.classPrefix,
+      colorFormat: o.colorFormat,
+      formats: [...o.formats].sort(),
+      colrv0: o.colrv0,
+      woff2Quality: o.woff2Quality,
+    }),
+  )
+}
+
+/** 读取源 svg(各 input 目录,按名排序)→ GroupInput[]。 */
+function readSvgInputs(inputs: string[]): GroupInput[] {
+  const out: GroupInput[] = []
+  for (const dir of inputs) {
+    let rels: string[] = []
+    try {
+      rels = globSync('**/*.svg', { cwd: dir })
+    } catch {
+      rels = []
+    }
+    rels.sort()
+    for (const rel of rels) {
+      try {
+        out.push({ path: resolve(dir, rel), content: readFileSync(resolve(dir, rel)) })
+      } catch {
+        /* 读不到就略过(下次仍 miss) */
+      }
+    }
   }
-  writeTextIfChanged(join(o.outDir, `${o.fontName}.css`), result.emitCss((a) => `./${a.fileName}`))
-  writeTextIfChanged(join(o.outDir, `${o.fontName}.ts`), result.dts)
-  await writeLockfile(o.codepointsFile, result.codepoints)
+  return out
+}
 
-  return result
+/** 合并公共参数到每个 item(item 同名字段覆盖公共)。 */
+function resolveItems(o: ColorfontOptions): ColorfontItem[] {
+  const { items, ...common } = o
+  return items.map((it) => ({ ...common, ...it }))
+}
+
+/**
+ * 便捷版(单字体实例):build 后把字体 / CSS / TS 实物落盘 outDir,经 groupCache 缓存。
+ * 命中(输入+选项未变、产物在盘、代表产物 .css hash 一致)→ 跳过整条管线,返回 null。
+ * 未命中 → 重建落盘,返回 BuildResult。码位锁(.codepoints.json)为「状态」非缓存产物,不随 cache:false 删除。
+ */
+export async function buildAndWrite(options: ColorfontItem): Promise<BuildResult | null> {
+  const o = resolveOptions(options)
+  const cssPath = join(o.outDir, `${o.fontName}.css`)
+  let captured: BuildResult | null = null
+
+  const r = await groupCache(
+    {
+      cacheFile: resolveCacheFile(`colorfont-${o.fontName}`, options.cacheFilename),
+      cache: o.cache,
+      configHash: configHashOf(o),
+      inputs: readSvgInputs(o.input),
+      representative: cssPath, // .css 必产 → 代表产物
+    },
+    async () => {
+      const result = await build(options) // 纯构建(无缓存)
+      captured = result
+      await mkdir(o.outDir, { recursive: true })
+      // 产物(字节)交给 groupCache 幂等落盘;码位锁单独写(非缓存产物)。
+      const products: { path: string; content: Buffer | Uint8Array | string }[] = result.assets.map((a) => ({ path: join(o.outDir, a.fileName), content: a.source }))
+      products.push({ path: cssPath, content: result.emitCss((a) => `./${a.fileName}`) })
+      products.push({ path: join(o.outDir, `${o.fontName}.ts`), content: result.dts })
+      await writeLockfile(o.codepointsFile, result.codepoints)
+      return products
+    },
+  )
+  return r.hit ? null : captured
+}
+
+/**
+ * 批量(多字体实例)引擎入口:按 items 生成所有字体,各自独立缓存。
+ * 单实例失败:throwable!==false → 抛错中止;否则告警继续。
+ */
+export async function generateColorfonts(options: ColorfontOptions): Promise<void> {
+  for (const item of resolveItems(options)) {
+    try {
+      const r = await buildAndWrite(item)
+      if (r === null) console.log(`[colorfont] 命中缓存,跳过:${item.fontName}`)
+      else console.log(`[colorfont] ${item.fontName}: ${r.assets.length} 个产物(${[...new Set(r.assets.map((a) => a.color))].join(', ')})`)
+    } catch (e) {
+      if (item.throwable === false) console.warn(`[colorfont] ${item.fontName} 生成失败:\n${String(e)}`)
+      else throw e
+    }
+  }
 }
 
 export { serializeLockfile, readLockfile } from './codepoints/lockfile.ts'
 
-// CLI 入口(供 vite-plugin-graphics-icon 的 bin 复用) —— 与 imagemin 对齐。
+// CLI 入口(供 graphics-icon 的 bin 复用) —— 与 imagemin 对齐。
 export { run as runCli } from './cli/cli.ts'
 
 export type {
   BuildResult,
+  ColorfontCommon,
+  ColorfontItem,
   ColorfontOptions,
   ColorFormat,
   FontAsset,

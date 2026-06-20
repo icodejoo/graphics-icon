@@ -23,6 +23,8 @@ export const defaultOptions: ImageminOptions = {
   // cacheFile 省略 → 默认落共享目录 .cache.graphics/imagemin.json
   logStats: true,
   concurrency: 8,
+  // 出错即抛错中止(默认);设 false 则仅告警并继续。
+  throwable: true,
 
   // ── 位图通用管线（按需开启；全部透传 sharp）──
   // sharpOptions: { limitInputPixels: 0 }, // 解除超大图像素上限

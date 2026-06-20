@@ -32,14 +32,11 @@ export interface BitmapIconsOutput {
   json?: string
 }
 
-/** 单组位图雪碧图配置。数组形式 => 生成多个独立的 sheet。 / One sprite-sheet config; an array yields multiple independent sheets. */
-export interface BitmapIconsConfig {
-  /** 源图目录(相对仓库根)。该目录下匹配 include/exclude 的位图会被打进一张 sheet。
-   *  约定:产物命名 *.sprite.{webp,png} 会被自动排除出源扫描,故产物可与源图同目录。 */
-  inputDir: string
-  /** 产物路径集合(image/style 必填,script/json 可选)。 */
-  output: BitmapIconsOutput
-
+/**
+ * 各实例可共享的「公共参数」(顶层设置;每个 item 与之合并,item 同名字段覆盖)。
+ * Shared "common" params (set at top level; merged into each item, item overrides).
+ */
+export interface BitmapIconsCommon {
   /** 精灵之间的间隙(px)。默认 2,防止相邻切片采样溢色。 */
   padding?: number
   /** 单张 sheet 的最大宽/高(px)。默认 4096(安全 GPU 纹理上限)。 */
@@ -49,44 +46,49 @@ export interface BitmapIconsConfig {
   pot?: boolean
   /** sheet 强制为正方形。默认 false。 */
   square?: boolean
-
-  /** 源图相对「逻辑像素」的倍率(@2x→2、@3x→3)。默认 1。
-   *  仅影响固定 px 类(逻辑尺寸 = 源尺寸 / pixelRatio,并整体 background-size 缩放);
-   *  自适应(fluid)类按比例计算,天然与密度无关。 */
+  /** 源图相对「逻辑像素」的倍率(@2x→2、@3x→3)。默认 1。 */
   pixelRatio?: number
-
-  /** 透传 sharp.png()(image 为 .png 时)。默认 { compressionLevel: 9, adaptiveFiltering: true }(无损保 alpha)。 */
+  /** 透传 sharp.png()(image 为 .png 时)。默认 { compressionLevel: 9, adaptiveFiltering: true }。 */
   png?: PngOptions
   /** 透传 sharp.webp()(image 为 .webp 时)。默认 { quality: 80, effort: 6 }。 */
   webp?: WebpOptions
-
-  /** CSS 类名前缀:基类 .${prefix} + 每图类 .${prefix}-${name}(单横线)。默认 "sprite"(可设 "icon" 等)。
-   *  注:TS 产物导出名固定 iconsImage/iconsName/IconName,不随 prefix 变。 */
+  /** CSS 类名前缀:基类 .${prefix} + 每图类 .${prefix}-${name}。默认 "sprite"。 */
   prefix?: string
   /** 由源文件「基础名(无扩展名)」生成精灵名。默认原样。名字须匹配 /^[a-zA-Z_][\w-]*$/。 */
   nameTransformer?: (basename: string) => string
-
   /** 纳入的图片 glob(相对 inputDir)。默认 ["**\/*.{png,jpg,jpeg,webp,avif}"]。 */
   include?: string | string[]
   /** 排除的 glob(优先级高于 include)。默认 []。 */
   exclude?: string | string[]
+  /** 是否启用缓存(默认 true);false → 删除该实例缓存与旧产物并强制重建。 / Enable cache (default true). */
+  cache?: boolean
+  /** 出错是否抛出并中止(默认 true);false → 仅告警并继续。 / Throw & abort on error (default true). */
+  throwable?: boolean
+}
+
+/** 单组位图雪碧图配置(公共参数 + 本实例专属)。 / One sprite-sheet config (common + instance-only). */
+export interface BitmapIconsItem extends BitmapIconsCommon {
+  /** 源图目录(相对仓库根)。约定:产物命名 *.sprite.{webp,png} 会被自动排除出源扫描。 */
+  inputDir: string
+  /** 产物路径集合(image/style 必填,script/json 可选)。 */
+  output: BitmapIconsOutput
+  /**
+   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名。省略 → 由 output.image 派生唯一默认名。
+   * vite 插件模式请用 `cacheName`(仅名字,目录由系统管理)。
+   */
+  cacheFilename?: string
 }
 
 /**
- * 插件入参(对象式):
- *   · sprites    —— 各实例配置(一个或多个 sheet)
- *   · cacheFile  —— 插件级缓存文件路径(整个插件只设一次,非实例级)。
- *                   省略 → 共享缓存目录下的 `.cache.graphics/bitmap-icons.json`(随仓库提交→团队共享)。
- *
- * Plugin options (object form):
- *   · sprites    —— per-instance configs (one or more sheets)
- *   · cacheFile  —— plugin-level cache-file path (set once for the whole plugin, not per instance).
- *                   Omit → `.cache.graphics/bitmap-icons.json` in the shared cache folder (commit it → team-shared).
+ * 插件/引擎入参:公共参数 + `items[]`。每个实例 = { ...公共, ...本项 }(本项覆盖公共)。
+ * Options: common params + `items[]`. Each instance = { ...common, ...item } (item wins).
  */
-export interface BitmapIconsOptions {
-  sprites: BitmapIconsConfig[]
-  cacheFile?: string
+export interface BitmapIconsOptions extends BitmapIconsCommon {
+  items: BitmapIconsItem[]
 }
+
+/** @deprecated 旧名,等价于 BitmapIconsItem(过渡用)。 / Old alias for BitmapIconsItem. */
+export type BitmapIconsConfig = BitmapIconsItem
 
 /** 一个精灵在 sheet 中的位置与尺寸(均为图集实际像素)。 / A sprite's position & size in the sheet (actual sheet pixels). */
 export interface IconFrame {

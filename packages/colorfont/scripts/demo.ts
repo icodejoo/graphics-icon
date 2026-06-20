@@ -72,6 +72,7 @@ const r = await buildAndWrite({
   colorFormat: 'colrv1',
   formats: ['woff2', 'woff'],
 })
+if (!r) throw new Error('demo: buildAndWrite 命中缓存(无产物结果)。先删 demoDir 或缓存后重跑。')
 const ms = performance.now() - t
 const flavors = [...new Set(r.assets.map((a) => a.color))]
 const totalKB = (r.assets.reduce((s, a) => s + a.source.length, 0) / 1024).toFixed(0)

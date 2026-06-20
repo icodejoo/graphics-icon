@@ -11,5 +11,5 @@ export type { ImageminOptions, FileResult, OptimizeResult } from "./imagemin.ts"
 
 export { defaultOptions } from "./options.ts"
 
-// CLI 入口(供 vite-plugin-graphics-icon 的 bin 复用,实现 pre-commit/全量压缩的完全平替)。
+// CLI 入口(供 graphics-icon 的 bin 复用,实现 pre-commit/全量压缩的完全平替)。
 export { runCli } from "./bin.ts"

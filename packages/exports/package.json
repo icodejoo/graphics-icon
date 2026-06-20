@@ -1,0 +1,102 @@
+{
+  "name": "graphics-icon",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Icon/image build toolkit: color icon webfont + bitmap sprite sheets + SVG symbol sprites + imagemin. Vite plugin (graphics-icon/vite) + standalone engines/CLI per subpath (graphics-icon/bitmap, /svg, /imagemin, /colorfont), with per-instance caching and on-demand loading.",
+  "keywords": [
+    "graphics-icon",
+    "vite-plugin",
+    "graphics",
+    "icons",
+    "webfont",
+    "colorfont",
+    "color-font",
+    "sprite-sheet",
+    "svg-sprite",
+    "svg-symbol",
+    "imagemin",
+    "image-optimization",
+    "sharp",
+    "svgo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/graphics-icon.git",
+    "directory": "packages/exports"
+  },
+  "homepage": "https://github.com/icodejoo/graphics-icon/tree/main/packages/exports",
+  "exports": {
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js"
+    },
+    "./bitmap": {
+      "types": "./dist/bitmap.d.ts",
+      "import": "./dist/bitmap.js"
+    },
+    "./svg": {
+      "types": "./dist/svg.d.ts",
+      "import": "./dist/svg.js"
+    },
+    "./imagemin": {
+      "types": "./dist/imagemin.d.ts",
+      "import": "./dist/imagemin.js"
+    },
+    "./colorfont": {
+      "types": "./dist/colorfont.d.ts",
+      "import": "./dist/colorfont.js"
+    }
+  },
+  "bin": {
+    "g-min": "./dist/bin.js",
+    "g-bitmap": "./dist/bin-bitmap.js",
+    "g-svg": "./dist/bin-svg.js",
+    "g-colorfont": "./dist/bin-colorfont.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/copy-wasm.mjs",
+    "test": "node test/acceptance.ts && node test/acceptance-dist.ts",
+    "prepublishOnly": "pnpm build",
+    "pub": "pnpm build && npm version patch --no-git-tag-version && git -C ../.. add -A && git -C ../.. commit -m \"release: graphics-icon\" && git -C ../.. push && pnpm publish --no-git-checks"
+  },
+  "dependencies": {
+    "cubic2quad": "^1.2.1",
+    "opentype.js": "^2.0.0",
+    "svg2ttf": "^6.1.0",
+    "ttf2woff": "^3.0.0",
+    "svgo": "catalog:",
+    "svgpath": "catalog:",
+    "scale-that-svg": "catalog:",
+    "sharp": "catalog:",
+    "maxrects-packer": "catalog:",
+    "vite-plugin-icons-spritesheet": "catalog:"
+  },
+  "peerDependencies": {
+    "vite": "^5 || ^6 || ^7 || ^8"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@graphics-icon/vite-umbrella": "workspace:*",
+    "@codejoo/colorfont": "workspace:*",
+    "bitmap-icons": "workspace:*",
+    "svg-icons": "workspace:*",
+    "@codejoo/imagemin": "workspace:*",
+    "@codejoo/utils": "workspace:*",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^24.0.0",
+    "vite": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

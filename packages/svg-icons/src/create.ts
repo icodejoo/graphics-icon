@@ -1,35 +1,46 @@
 /**
- * svg-icons 工厂：把「配置」装配成可直接用于 vite.config 的插件数组。
+ * svg-icons 工厂 + 引擎：把「公共参数 + items[]」装配成 SVG 雪碧图。
  *
  * 职责：
- *   · output.svg/script → 第三方 vite-plugin-icons-spritesheet 原始选项的映射；
- *   · 缓存闸门（cache.ts）：源+配置未变且产物在 → 跳过调用底层生成器，避免每次启动重建；
+ *   · 多实例：顶层公共参数合并进每个 item（item 覆盖公共）；每实例独立缓存文件。
+ *   · 缓存：统一 groupCache（@codejoo/utils）——输入指纹 + configHash + 代表产物(sprite svg) hash；
+ *     底层第三方工具与后处理「就地写盘」,故产物以 path-only 交给 groupCache 读回校验。
  *   · 后处理（post-process.ts）：归一化(可选) + id 作用域化 + 颜色改写 + 自产 script。
+ *   · throwable：单实例失败时,true(默认)抛错中止 / false 告警继续。
  *
- * svg-icons factory: assembles configs into a Plugin[] for vite.config.
- *   · maps output.svg/script → underlying vite-plugin-icons-spritesheet options
- *   · cache gate (cache.ts): skip the underlying generator when sources/config unchanged and outputs exist
- *   · post-processing (post-process.ts): optional normalize + id scoping + color rewrite + self-emitted script
- *
- * 按需加载 / on-demand: 重依赖 vite-plugin-icons-spritesheet 通过动态 import() 延迟到 buildStart，
- * 故仅 import { svgIcons } 不会即时拉起底层插件；colorfont 风格的 normalize 路径也已在 @codejoo/utils
- * 内部惰性加载（svgo/svgpath 仅在调用时加载）。
+ * 按需加载：重依赖 vite-plugin-icons-spritesheet 经动态 import() 延迟到生成时；
+ * colorfont 风格 normalize 路径在 @codejoo/utils 内部惰性加载 svgo/svgpath。
  */
 
-import { basename, dirname } from "node:path"
+import { globSync, readFileSync } from "node:fs"
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path"
 
-import { resolveCacheFile, pruneCache } from "@codejoo/utils/cache"
+import { groupCache, resolveCacheFile } from "@codejoo/utils/cache"
+import { sha256 } from "@codejoo/utils/hash"
 
-import { computeStamp, isCached, writeStamp } from "./cache.ts"
 import { runPostProcess } from "./post-process.ts"
 
-import type { PostTarget } from "./post-process.ts"
-import type { SvgIconsConfig, SvgIconsOptions } from "./types.ts"
+import type { ColorOption, SvgIconsItem, SvgIconsOptions } from "./types.ts"
+import type { GroupInput } from "@codejoo/utils/cache"
 import type { Plugin } from "vite"
 
-/** 配置 → 第三方插件的原始选项。 / Map a config to the underlying plugin's options. */
-function toUnderlying(c: SvgIconsConfig) {
-  // withTypes:false —— script 完全由后处理自产（iconsHref + iconsName + IconName），不用插件的运行时代码。
+// 生成器版本：改后处理逻辑/产物结构/缓存模型时 +1,使旧缓存失效。
+const GENERATOR_VERSION = "5"
+
+// 函数无法稳定序列化 → 用 toString() 参与指纹（改了颜色函数即视为配置变化）。
+function serializeColor(c: ColorOption): string {
+  return typeof c === "function" ? `fn:${c.toString()}` : JSON.stringify(c ?? null)
+}
+
+/** 合并公共参数到每个 item（item 同名字段覆盖公共）。 / Merge common into each item (item wins). */
+function resolveItems(o: SvgIconsOptions): SvgIconsItem[] {
+  const { items, ...common } = o
+  return items.map((it) => ({ ...common, ...it }))
+}
+
+/** item → 第三方插件原始选项。 / Map an item to the underlying plugin's options. */
+function toUnderlying(c: SvgIconsItem) {
+  // withTypes:false —— script 完全由后处理自产（iconsHref + iconsName + IconName）。
   return {
     inputDir: c.input,
     outputDir: dirname(c.output.svg),
@@ -40,113 +51,122 @@ function toUnderlying(c: SvgIconsConfig) {
   }
 }
 
-/** 由配置生成插件实例数组（供 vite.config 使用）。 / Build the Plugin[] from options. */
-export function svgIcons(options: SvgIconsOptions): Plugin[] {
-  const configs = options.sprites
-  // 插件级缓存(整插件一份)：省略则落共享缓存目录 .cache.graphics/svg-icons.json。
-  const cacheFile = resolveCacheFile("svg-icons", options.cacheFile)
-
-  // 底层第三方插件按需加载：每个实例对应一个底层插件，惰性创建（在首个 buildStart 时一次性 import + 构造）。
-  // Underlying plugins are created lazily: a single dynamic import in the first buildStart builds them all.
-  let underlyingPlugins: Plugin[] | null = null
-  let buildingPromise: Promise<Plugin[]> | null = null
-  let pruned = false
-
-  async function ensureUnderlying(): Promise<Plugin[]> {
-    if (underlyingPlugins) return underlyingPlugins
-    if (!buildingPromise) {
-      buildingPromise = (async () => {
-        // 动态 import：仅在 buildStart 真正触发时才拉起 vite-plugin-icons-spritesheet。
-        const { iconsSpritesheet } = await import("vite-plugin-icons-spritesheet")
-        const underlying = configs.map(toUnderlying)
-        // 原始用法：iconsSpritesheet(配置数组) 一次返回一个插件数组，逐个包装其钩子。
-        underlyingPlugins = iconsSpritesheet(underlying as Parameters<typeof iconsSpritesheet>[0]) as Plugin[]
-        return underlyingPlugins
-      })()
-    }
-    return buildingPromise
+/** 读取源 svg（按名排序）→ GroupInput[]（路径 + 内容）。 / Read source svgs → GroupInput[]. */
+function readInputs(input: string): GroupInput[] {
+  const dir = resolve(input)
+  let rels: string[] = []
+  try {
+    rels = globSync("**/*.svg", { cwd: dir })
+  } catch {
+    rels = []
   }
-
-  // 缓存闸门：命中→跳过底层生成器与后处理；未命中→生成、后处理、写戳。
-  // orig 为某底层插件钩子的「取值器」（惰性拿到对应钩子）。
-  const gate =
-    (getOrig: (p: Plugin) => unknown, index: number) =>
-    async function (this: unknown, ...args: unknown[]): Promise<unknown> {
-      const c = configs[index]
-      const target: PostTarget = {
-        sprite: c.output.svg,
-        script: c.output.script,
-        color: c.color,
-        normalize: c.normalize,
-      }
-      const stamp = computeStamp(c)
-      if (isCached(c, stamp, cacheFile)) {
-        console.log(`[svg-icons] 命中缓存，跳过：${c.output.svg}`)
-        return undefined
-      }
-      const plugins = await ensureUnderlying()
-      const orig = getOrig(plugins[index])
-      const r = typeof orig === "function" ? await (orig as (...a: unknown[]) => unknown).apply(this, args) : undefined
-      await runPostProcess(target)
-      writeStamp(c, stamp, cacheFile)
-      return r
+  rels.sort()
+  const out: GroupInput[] = []
+  for (const rel of rels) {
+    try {
+      out.push({ path: resolve(dir, rel), content: readFileSync(resolve(dir, rel)) })
+    } catch {
+      /* 读不到就略过（下次仍会 miss） */
     }
+  }
+  return out
+}
 
-  // 为每个配置实例输出一个包装插件。底层插件惰性创建，故此处无需提前持有它们的钩子引用。
-  return configs.map((_c, i) => {
-    const buildStartGated = gate((p) => p.buildStart, i)
-    const buildStart = async function (this: unknown, ...args: unknown[]): Promise<unknown> {
-      // buildStart 额外在最前做一次剪枝（多实例共享缓存时只剪一次）
-      if (!pruned) {
-        pruned = true
-        pruneCache(
-          cacheFile,
-          configs.map((c) => c.output.svg),
-          "[svg-icons]",
-        )
-      }
-      return buildStartGated.apply(this, args)
-    }
+/** 影响产物的配置指纹（不含输入内容,那在 groupCache.files 里）。 / Config fingerprint (excludes inputs). */
+function configHashOf(c: SvgIconsItem): string {
+  return sha256(
+    JSON.stringify({
+      v: GENERATOR_VERSION,
+      svg: c.output.svg,
+      script: c.output.script ?? null,
+      color: serializeColor(c.color),
+      normalize: JSON.stringify(c.normalize ?? null),
+      nameTransformer: c.iconNameTransformer?.toString() ?? null,
+      formatter: c.formatter ?? "oxfmt",
+    }),
+  )
+}
 
-    return {
-      name: "vite-plugin-svg-icons",
-      buildStart,
-      watchChange: gate((p) => p.watchChange, i),
-      handleHotUpdate: gate((p) => p.handleHotUpdate, i),
-    } as Plugin
-  })
+/** 每实例缓存文件:cacheFilename 优先;否则由输出名派生唯一默认名。 / Per-item cache file. */
+function cacheFileOf(item: SvgIconsItem): string {
+  const def = `svg-icons-${basename(item.output.svg).replace(/\.\w+$/, "")}`
+  return resolveCacheFile(def, item.cacheFilename)
+}
+
+/** 单实例生成(经 groupCache)。返回是否命中。 / Generate one instance via groupCache; returns hit. */
+async function generateOne(item: SvgIconsItem, underlyingBuildStart?: () => Promise<void>): Promise<boolean> {
+  const r = await groupCache(
+    {
+      cacheFile: cacheFileOf(item),
+      cache: item.cache !== false,
+      configHash: configHashOf(item),
+      inputs: readInputs(item.input),
+      representative: item.output.svg, // sprite svg 必产 → 代表产物
+    },
+    async () => {
+      // 第三方工具写出 sprite svg → 后处理就地重写(作用域/颜色)+ 自产 script。
+      if (underlyingBuildStart) await underlyingBuildStart()
+      await runPostProcess({ sprite: item.output.svg, script: item.output.script, color: item.color, normalize: item.normalize })
+      // 产物经 side-effect 写盘,只交路径给 groupCache 读回校验。
+      const products: { path: string }[] = [{ path: item.output.svg }]
+      if (item.output.script) products.push({ path: item.output.script })
+      return products
+    },
+  )
+  return r.hit
 }
 
 /**
- * 引擎入口（Vite 之外可单独调用）：一次性生成所有 SVG 雪碧图 + 类型化脚本，并维护共享缓存。
- * 复用与插件相同的缓存闸门与后处理；底层 vite-plugin-icons-spritesheet 在 rollup 上下文桩上跑 buildStart。
- *
- * Standalone engine (usable outside Vite): generate every SVG sprite + typed script in one shot,
- * reusing the same cache gate + post-processing as the plugin; the underlying generator's buildStart
- * runs against a stubbed rollup context.
+ * 引擎入口（Vite 之外可单独调用）：按 items 生成所有 SVG 雪碧图 + 类型化脚本,维护各实例缓存。
+ * 单实例失败:throwable!==false → 抛错中止;否则告警继续。
  */
 export async function generateSvgSprites(options: SvgIconsOptions): Promise<void> {
-  const configs = options.sprites
-  const cacheFile = resolveCacheFile("svg-icons", options.cacheFile)
-  pruneCache(
-    cacheFile,
-    configs.map((c) => c.output.svg),
-    "[svg-icons]",
-  )
+  const items = resolveItems(options)
   const { iconsSpritesheet } = await import("vite-plugin-icons-spritesheet")
-  const underlying = iconsSpritesheet(configs.map(toUnderlying) as Parameters<typeof iconsSpritesheet>[0]) as Plugin[]
-  // rollup 插件上下文桩：底层 buildStart 内若访问 this.xxx() 一律 no-op（Vite 之外）。
+  const underlying = iconsSpritesheet(items.map(toUnderlying) as Parameters<typeof iconsSpritesheet>[0]) as Plugin[]
+  // rollup 上下文桩:底层 buildStart 内若访问 this.xxx() 一律 no-op（Vite 之外）。
   const ctx = new Proxy({}, { get: () => () => {} })
-  for (let i = 0; i < configs.length; i++) {
-    const c = configs[i]
-    const stamp = computeStamp(c)
-    if (isCached(c, stamp, cacheFile)) {
-      console.log(`[svg-icons] 命中缓存，跳过：${c.output.svg}`)
-      continue
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    try {
+      const bs = underlying[i]?.buildStart
+      const run = typeof bs === "function" ? () => (bs as (...a: unknown[]) => unknown).call(ctx) as Promise<void> : undefined
+      const hit = await generateOne(item, run)
+      if (hit) console.log(`[svg-icons] 命中缓存,跳过:${item.output.svg}`)
+    } catch (e) {
+      if (item.throwable === false) console.warn(`[svg-icons] ${item.input} 生成失败:\n${String(e)}`)
+      else throw e
     }
-    const bs = underlying[i]?.buildStart
-    if (typeof bs === "function") await (bs as (...a: unknown[]) => unknown).call(ctx)
-    await runPostProcess({ sprite: c.output.svg, script: c.output.script, color: c.color, normalize: c.normalize })
-    writeStamp(c, stamp, cacheFile)
+  }
+}
+
+/**
+ * vite 插件工厂：返回单个 Plugin。buildStart 生成全部;源目录变更(watch/HMR)则重生成。
+ * Vite plugin factory: a single Plugin; regenerates on source changes.
+ */
+export function svgIcons(options: SvgIconsOptions): Plugin {
+  const items = resolveItems(options)
+  const roots = items.map((c) => resolve(c.input))
+  const ownOutputs = new Set(items.flatMap((c) => [c.output.svg, c.output.script].filter((p): p is string => Boolean(p)).map((p) => resolve(p))))
+  // 仅当变更文件落在某 input 目录内（且非自身产物）才重生成。
+  const affects = (file: string): boolean => {
+    const f = resolve(file)
+    if (ownOutputs.has(f)) return false
+    return roots.some((root) => {
+      const rel = relative(root, f)
+      return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
+    })
+  }
+  return {
+    name: "vite-plugin-svg-icons",
+    async buildStart() {
+      await generateSvgSprites(options)
+    },
+    async watchChange(id) {
+      if (affects(id)) await generateSvgSprites(options)
+    },
+    async handleHotUpdate({ file }) {
+      if (affects(file)) await generateSvgSprites(options)
+    },
   }
 }

@@ -37,7 +37,7 @@ const baseArgs = ['--input', fixtures, '--out', out, '--name', 'CliIcons', '--fo
   assert(files.some((f) => f.endsWith('.woff2')), 'build 产出 woff2')
   assert(files.includes('CliIcons.css'), 'build 产出 css')
   assert(files.includes('CliIcons.ts'), 'build 产出 ts 入口')
-  assert(files.includes('codepoints.json'), 'build 产出 codepoints.json')
+  assert(files.includes('CliIcons.codepoints.json'), 'build 产出 <fontName>.codepoints.json')
 }
 
 // 3) check —— 已有锁文件,应通过

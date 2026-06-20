@@ -10,6 +10,10 @@ const out = resolve(here, '../.smoke-out')
 
 await rm(out, { recursive: true, force: true })
 
+function assert(cond: unknown, msg: string): asserts cond {
+  if (!cond) throw new Error('ASSERT FAILED: ' + msg)
+}
+
 const result = await buildAndWrite({
   input: fixtures,
   outDir: out,
@@ -17,10 +21,8 @@ const result = await buildAndWrite({
   formats: ['woff2', 'woff', 'ttf'],
   colorFormat: 'auto',
 })
-
-function assert(cond: unknown, msg: string): asserts cond {
-  if (!cond) throw new Error('ASSERT FAILED: ' + msg)
-}
+// out 已删 → 必然重建(非缓存命中),result 必非空。
+assert(result, 'buildAndWrite 应返回结果(out 已删 → 必然重建)')
 
 const monoWoff2 = result.assets.find((a) => a.color === 'mono' && a.format === 'woff2')
 assert(monoWoff2, 'mono woff2 资产存在')

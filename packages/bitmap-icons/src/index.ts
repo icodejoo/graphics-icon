@@ -22,4 +22,4 @@ export { bitmapIcons } from "./plugin.ts"
 export { generateBitmapSheets } from "./generate-sheet.ts"
 export { runCli } from "./bin.ts"
 
-export type { BitmapIconsOptions, BitmapIconsConfig, BitmapIconsOutput, IconFrame, IconManifest, IconSheetMeta } from "./types.ts"
+export type { BitmapIconsOptions, BitmapIconsCommon, BitmapIconsItem, BitmapIconsConfig, BitmapIconsOutput, IconFrame, IconManifest, IconSheetMeta } from "./types.ts"

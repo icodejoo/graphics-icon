@@ -22,7 +22,7 @@ function getConfigArg(argv: string[]): string | undefined {
   return i >= 0 && argv[i + 1] ? argv[i + 1] : undefined
 }
 
-/** 运行 CLI（可被 vite-plugin-graphics-icon 的 bin 复用）。 / Run the CLI (reused by the umbrella bin). */
+/** 运行 CLI（可被 graphics-icon 的 bin 复用）。 / Run the CLI (reused by the umbrella bin). */
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const configPath = getConfigArg(argv)
   if (!configPath) {
