@@ -16,11 +16,11 @@ description: >-
   - 子路径:`graphics-icon/vite`(伞插件 `graphicsIcon`,默认导出)、`/colorfont`(`build`/`buildAndWrite`/`colorfonts`/`runCli`)、`/svg`(`svgIcons`/`runCli`)、`/bitmap`(`bitmapIcons`/`runCli`)、`/imagemin`(`imagemin`/`defaultOptions`/`runCli`)、`/unused`(`removeUnused`/`findUnused`/`runCli`)。
   - CLI:`color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`。
 - `@graphics-icon/vite-umbrella`(**packages/vite-plugin**)—— **私有**,仅含伞 Vite 插件 `graphicsIcon`(钩子多路复用);不发布,经 `graphics-icon/vite` 再导出。
-- `@codejoo/colorfont` —— 彩色 webfont 引擎(纯 JS,本 skill 的深挖对象)+ CLI(`runCli`)。
+- `color-fonts` —— 彩色 webfont 引擎(纯 JS,本 skill 的深挖对象)+ CLI(`runCli`)。
 - `bitmap-icons` —— 位图雪碧图引擎(`bitmapIcons`)+ 内部插件工厂。
 - `svg-icons` —— SVG 雪碧图引擎(`svgIcons`)+ 内部插件工厂。
 - `@codejoo/imagemin` —— 图片压缩引擎(`imagemin`)+ CLI。
-- `@codejoo/unused`(**packages/unused**)—— 无用**文件**检测(不限资产,`ext`/`include` 任意后缀)→ 写清单表,删除分离。两后端:`unusedVite`(模块图,`apply:'build'`,走 vite,代码可达性更准)与 `findUnused`/`remove-unused --scan`(静态扫描,不依赖 vite)。`removeUnused`/`remove-unused` 读表删除,带 `include`/`exclude` 安全闸(`dryRun` 仅打印)。经伞插件 `unused` 键集成时自动排除四引擎的输入/输出。
+- `unused`(**packages/unused**)—— 无用**文件**检测(不限资产,`ext`/`include` 任意后缀)→ 写清单表,删除分离。两后端:`unusedVite`(模块图,`apply:'build'`,走 vite,代码可达性更准)与 `findUnused`/`remove-unused --scan`(静态扫描,不依赖 vite)。`removeUnused`/`remove-unused` 读表删除,带 `include`/`exclude` 安全闸(`dryRun` 仅打印)。经伞插件 `unused` 键集成时自动排除四引擎的输入/输出。
 - `@codejoo/utils` —— 内部公共子模块(hash/fingerprint/glob/path-rel/fs-write/cache(含统一 `groupCache`)/scale-svg)。
 - colorfont 内含两个 Rust→wasm crate:`colrv1-writer`(COLRv1 写表)、`woff2`(可调质量 woff2 编码,ttf2woff2)。
 

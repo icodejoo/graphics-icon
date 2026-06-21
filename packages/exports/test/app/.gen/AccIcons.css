@@ -1,8 +1,7 @@
 @font-face {
   font-family: "AccIcons";
   font-display: block;
-  src: url("./AccIcons.mono.7d089a8a.woff2") format("woff2") /* WOFF2:Chrome/Edge/Firefox/Safari 等所有现代浏览器 */,
-       url("./AccIcons.mono.0d47e37d.woff") format("woff") /* WOFF:更老的浏览器(IE11 / 旧版 Safari) */;
+  src: url("./AccIcons.mono.woff2") format("woff2") /* WOFF2:Chrome/Edge/Firefox/Safari 等所有现代浏览器 */;
 }
 
 /* 现代浏览器:tech() 各取所需(后写的 @font-face 同 family 覆盖上面的保底) */
@@ -10,9 +9,10 @@
   font-family: "AccIcons";
   font-display: block;
   src:
-    url("./AccIcons.otsvg.aee32882.woff2") format("woff2") tech(color-svg) /* Safari / iOS:OT-SVG(Chromium 永不支持 OT-SVG,故此格式专供 Safari) */,
-    url("./AccIcons.colrv0.c1a7198c.woff2") format("woff2") tech(color-colrv0) /* 较旧的 Chrome/Edge/Firefox:COLRv0 平涂多色(不支持渐变) */,
-    url("./AccIcons.mono.7d089a8a.woff2") format("woff2") /* 所有浏览器:单色轮廓回退(渲染器不认彩色表时用) */;
+    url("./AccIcons.colrv1.woff2") format("woff2") tech(color-colrv1) /* Chrome/Edge 98+ 与 Firefox:COLRv1 渐变矢量(体积最小、可 font-palette 换色) */,
+    url("./AccIcons.otsvg.woff2") format("woff2") tech(color-svg) /* Safari / iOS:OT-SVG(Chromium 永不支持 OT-SVG,故此格式专供 Safari) */,
+    url("./AccIcons.colrv0.woff2") format("woff2") tech(color-colrv0) /* 较旧的 Chrome/Edge/Firefox:COLRv0 平涂多色(不支持渐变) */,
+    url("./AccIcons.mono.woff2") format("woff2") /* 所有浏览器:单色轮廓回退(渲染器不认彩色表时用) */;
 }
 
 .icon {

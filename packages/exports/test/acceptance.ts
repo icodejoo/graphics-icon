@@ -12,7 +12,7 @@ import graphicsIcon from '../src/vite.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(here, 'app')
-const fixtures = resolve(here, '../../colorfont/fixtures')
+const fixtures = resolve(here, '../../color-fonts/fixtures')
 const distDir = resolve(here, '.acc-dist')
 const gen = resolve(appRoot, '.gen') // colorfont 实物落盘(被 app/main.ts 导入)
 const svgGen = resolve(here, '.acc-svg')

@@ -1,6 +1,6 @@
 /**
- * @codejoo/unused 类型与默认值。
- * Types & defaults for @codejoo/unused.
+ * unused 类型与默认值。
+ * Types & defaults for unused.
  */
 
 /**

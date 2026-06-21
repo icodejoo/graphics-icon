@@ -1,4 +1,4 @@
-// @codejoo/unused 自测:vite 模块图检测 + 静态检测(findUnused)+ 排除 + include/exclude 删除闸。Node 24 直接跑 .ts。
+// unused 自测:vite 模块图检测 + 静态检测(findUnused)+ 排除 + include/exclude 删除闸。Node 24 直接跑 .ts。
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -82,9 +82,9 @@ async function main(): Promise<void> {
 
   rmSync(tmp, { recursive: true, force: true })
 
-  if (failed === 0) console.log(`\n✅ @codejoo/unused test: ${passed} passed, 0 failed`)
+  if (failed === 0) console.log(`\n✅ unused test: ${passed} passed, 0 failed`)
   else {
-    console.error(`\n❌ @codejoo/unused test: ${passed} passed, ${failed} failed`)
+    console.error(`\n❌ unused test: ${passed} passed, ${failed} failed`)
     process.exit(1)
   }
 }

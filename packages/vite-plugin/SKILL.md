@@ -12,14 +12,14 @@ description: >-
 把四个引擎组合成**一个** Vite 插件 `graphicsIcon`,并**按需启用**:只有被传入且非 `false` 的子能力才会实例化。
 本包是**私有的**(`private: true`,`@graphics-icon/vite-umbrella`),**不发布**——它**只含伞 Vite 插件**(`graphicsIcon` +
 合并/插件壳)。对外发布物是 `graphics-icon`(在 **packages/exports**),由它把本包再导出为 `graphics-icon/vite`,并额外提供
-各引擎子路径(`graphics-icon/colorfont` `/svg` `/bitmap` `/imagemin`)与 4 个 CLI。其余引擎包(`@codejoo/colorfont`、
+各引擎子路径(`graphics-icon/colorfont` `/svg` `/bitmap` `/imagemin`)与 4 个 CLI。其余引擎包(`color-fonts`、
 `bitmap-icons`、`svg-icons`、`@codejoo/imagemin`、`@codejoo/utils`)都是私有内部实现,tsup 在 `packages/exports` 构建时
 通过 `noExternal` 内联进发布包 `dist`。
 
 ## 功能(四子能力,均为「双形态」)
 每个引擎都既能经本伞插件集成进 Vite,又能在 Vite 之外作为**引擎函数 + CLI** 单独用——但单独用是经发布包的子路径
 (`graphics-icon/colorfont` 等)与 CLI bin,**不**经本私有包。
-- **colorfont**:SVG 图标 → 彩色 webfont(mono/COLRv0/OT-SVG/COLRv1)。引擎 `@codejoo/colorfont`;插件壳
+- **colorfont**:SVG 图标 → 彩色 webfont(mono/COLRv0/OT-SVG/COLRv1)。引擎 `color-fonts`;插件壳
   `src/colorfont-plugin.ts`。**实物落盘**(见下)。
 - **bitmap-icons**:位图 → 单张雪碧图集 + 样式 + 入口脚本。引擎 `bitmapIcons`;插件工厂 `bitmapIconsVite(opts): Plugin`。
 - **svg-icons**:SVG 雪碧图(`<symbol>`+`<use href>`)。引擎 `svgIcons`;插件工厂 `svgIconsVite(opts): Plugin[]`。

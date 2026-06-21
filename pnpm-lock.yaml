@@ -57,7 +57,7 @@ importers:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)
 
-  packages/colorfont:
+  packages/color-fonts:
     dependencies:
       '@codejoo/utils':
         specifier: workspace:*
@@ -133,15 +133,9 @@ importers:
         specifier: 'catalog:'
         version: 3.1.0(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7))
     devDependencies:
-      '@codejoo/colorfont':
-        specifier: workspace:*
-        version: link:../colorfont
       '@codejoo/imagemin':
         specifier: workspace:*
         version: link:../imagemin
-      '@codejoo/unused':
-        specifier: workspace:*
-        version: link:../unused
       '@codejoo/utils':
         specifier: workspace:*
         version: link:../utils
@@ -154,6 +148,9 @@ importers:
       bitmap-icons:
         specifier: workspace:*
         version: link:../bitmap-icons
+      color-fonts:
+        specifier: workspace:*
+        version: link:../color-fonts
       svg-icons:
         specifier: workspace:*
         version: link:../svg-icons
@@ -163,6 +160,9 @@ importers:
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
+      unused:
+        specifier: workspace:*
+        version: link:../unused
       vite:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)
@@ -266,21 +266,21 @@ importers:
 
   packages/vite-plugin:
     dependencies:
-      '@codejoo/colorfont':
-        specifier: workspace:*
-        version: link:../colorfont
       '@codejoo/imagemin':
         specifier: workspace:*
         version: link:../imagemin
-      '@codejoo/unused':
-        specifier: workspace:*
-        version: link:../unused
       bitmap-icons:
         specifier: workspace:*
         version: link:../bitmap-icons
+      color-fonts:
+        specifier: workspace:*
+        version: link:../color-fonts
       svg-icons:
         specifier: workspace:*
         version: link:../svg-icons
+      unused:
+        specifier: workspace:*
+        version: link:../unused
     devDependencies:
       '@types/node':
         specifier: ^24.0.0

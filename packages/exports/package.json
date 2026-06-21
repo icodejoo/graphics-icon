@@ -1,6 +1,6 @@
 {
   "name": "graphics-icon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "license": "MIT",
   "description": "Icon/image build toolkit: color icon webfont + bitmap sprite sheets + SVG symbol sprites + imagemin. Vite plugin (graphics-icon/vite) + standalone engines/CLI per subpath (graphics-icon/bitmap, /svg, /imagemin, /colorfont), with per-instance caching and on-demand loading.",
@@ -86,10 +86,11 @@
   },
   "devDependencies": {
     "@graphics-icon/vite-umbrella": "workspace:*",
-    "@codejoo/colorfont": "workspace:*",
+    "color-fonts": "workspace:*",
     "bitmap-icons": "workspace:*",
     "svg-icons": "workspace:*",
     "@codejoo/imagemin": "workspace:*",
+    "unused": "workspace:*",
     "@codejoo/utils": "workspace:*",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0",

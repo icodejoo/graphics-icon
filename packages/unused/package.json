@@ -1,5 +1,5 @@
 {
-  "name": "@codejoo/unused",
+  "name": "unused",
   "private": true,
   "version": "0.0.0",
   "description": "Detect unused static assets during Vite build (module-graph diff -> manifest table) and delete them on demand (removeUnused / remove-unused CLI). Engine inputs/outputs are auto-excluded when used via the graphics-icon umbrella, so icon sources are never flagged.",

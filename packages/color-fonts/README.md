@@ -1,4 +1,4 @@
-# @codejoo/colorfont
+# color-fonts
 
 > 把一组 **SVG 图标编译成彩色图标 webfont**（mono / COLRv0 / OT-SVG / COLRv1）的引擎。纯 JS + 预编译 wasm，安装无需 `node-gyp` / 原生编译。
 > Engine that compiles a folder of **SVG icons → a color icon webfont**. Pure JS + prebuilt wasm.
@@ -23,7 +23,7 @@ WOFF2 容器由 `ttf2woff2`（Rust）→ wasm 编码（预编译内置）。
 
 ### 引擎函数
 
-从发布包子路径 `graphics-icon/colorfont` 导入引擎函数（私有包名 `@codejoo/colorfont` 仅 monorepo 内部用）：
+从发布包子路径 `graphics-icon/colorfont` 导入引擎函数（私有包名 `color-fonts` 仅 monorepo 内部用）：
 
 ```ts
 import { build, buildAndWrite, colorfonts } from 'graphics-icon/colorfont'

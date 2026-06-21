@@ -20,15 +20,15 @@ import { promises as fs } from 'node:fs'
 
 import { svgIconsVite } from 'svg-icons'
 import { bitmapIconsVite } from 'bitmap-icons'
-import { colorfonts } from '@codejoo/colorfont'
-import { unusedVite } from '@codejoo/unused'
+import { colorfonts } from 'color-fonts'
+import { unusedVite } from 'unused'
 import * as imageminEngine from '@codejoo/imagemin'
 
 import type { Plugin } from 'vite'
-import type { ColorfontCommon, ColorfontItem, ColorfontOptions } from '@codejoo/colorfont'
+import type { ColorfontCommon, ColorfontItem, ColorfontOptions } from 'color-fonts'
 import type { SvgIconsCommon, SvgIconsItem } from 'svg-icons'
 import type { BitmapIconsCommon, BitmapIconsItem } from 'bitmap-icons'
-import type { UnusedDetectOptions } from '@codejoo/unused'
+import type { UnusedDetectOptions } from 'unused'
 
 // ── vite 选项:每实例用 cacheName(仅文件名),不暴露独立模式的 cacheFilename ──
 /** 把实例的 `cacheFilename` 替换为 `cacheName`(vite 模式只给名字,目录由系统管理)。 */
@@ -220,7 +220,7 @@ export default function graphicsIcon(options: GraphicsIconOptions = {}): Plugin 
 }
 
 // ── 选项类型再导出 ──
-export type { ColorfontItem, ColorfontCommon } from '@codejoo/colorfont'
+export type { ColorfontItem, ColorfontCommon } from 'color-fonts'
 export type { SvgIconsItem, SvgIconsCommon } from 'svg-icons'
 export type { BitmapIconsItem, BitmapIconsCommon } from 'bitmap-icons'
-export type { UnusedDetectOptions } from '@codejoo/unused'
+export type { UnusedDetectOptions } from 'unused'

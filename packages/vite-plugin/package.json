@@ -12,11 +12,11 @@
     }
   },
   "dependencies": {
-    "@codejoo/colorfont": "workspace:*",
+    "color-fonts": "workspace:*",
     "bitmap-icons": "workspace:*",
     "svg-icons": "workspace:*",
     "@codejoo/imagemin": "workspace:*",
-    "@codejoo/unused": "workspace:*"
+    "unused": "workspace:*"
   },
   "peerDependencies": {
     "vite": "^5 || ^6 || ^7 || ^8"

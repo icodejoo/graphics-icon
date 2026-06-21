@@ -18,10 +18,10 @@ export default defineConfig({
   ],
   format: ['esm'],
   // 把私有 workspace 包(伞插件 + 引擎 + utils)的类型内联进本包 .d.ts,使发布后类型自包含。
-  dts: { resolve: [/^@graphics-icon\//, /^bitmap-icons/, /^svg-icons/, /^@codejoo\//] },
+  dts: { resolve: [/^@graphics-icon\//, /^bitmap-icons/, /^svg-icons/, /^color-fonts/, /^unused/, /^@codejoo\//] },
   clean: true,
   treeshake: true,
   // 把伞插件 + 引擎 + utils 的源/产物内联进本包(自包含);vite 作为 peer 保持 external。
-  noExternal: ['@graphics-icon/vite-umbrella', '@codejoo/colorfont', 'bitmap-icons', 'svg-icons', '@codejoo/imagemin', '@codejoo/unused', '@codejoo/utils'],
+  noExternal: ['@graphics-icon/vite-umbrella', 'color-fonts', 'bitmap-icons', 'svg-icons', '@codejoo/imagemin', 'unused', '@codejoo/utils'],
   external: ['vite'],
 })

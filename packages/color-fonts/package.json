@@ -1,5 +1,5 @@
 {
-  "name": "@codejoo/colorfont",
+  "name": "color-fonts",
   "version": "0.0.0",
   "private": true,
   "description": "Engine that compiles a folder of SVG icons into a color icon webfont (mono / COLRv0 / OT-SVG / COLRv1) with a tech() fallback @font-face and stable codepoints. Pure JS, no node-gyp. Consumed as source by graphics-icon.",
@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/icodejoo/svg2colorfont.git",
-    "directory": "packages/colorfont"
+    "directory": "packages/color-fonts"
   },
   "bin": {
     "colorfont": "./dist/cli/bin.js"

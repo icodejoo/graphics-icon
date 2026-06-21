@@ -1,8 +1,8 @@
 ---
 name: colorfont
 description: >-
-  @codejoo/colorfont(SVG 图标 → 彩色 webfont 引擎)的目的、结构、关键选型与维护要点。
-  在 D:\workspaces\colorfont 上维护 packages/colorfont(改引擎/CLI/wasm/性能)时参考本 skill。
+  color-fonts(SVG 图标 → 彩色 webfont 引擎)的目的、结构、关键选型与维护要点。
+  在 D:\workspaces\colorfont 上维护 packages/color-fonts(改引擎/CLI/wasm/性能)时参考本 skill。
 ---
 
 # colorfont —— SVG 图标 → 彩色 webfont(单包)
@@ -12,10 +12,10 @@ description: >-
 **实物落盘**(真实 `.css`/`.ts`/字体/码位锁,无虚拟模块)、稳定码位。纯 JS、无 node-gyp、安装期零原生编译。面向 npm 社区开源。
 现为 graphics-icon 套件成员,与 bitmap-icons / svg-icons / imagemin / utils 平级,经发布包 `graphics-icon`(packages/exports)的子路径 `graphics-icon/colorfont` 对外。
 
-## 结构(引擎-only 私有包 `@codejoo/colorfont`,Vite 插件在 `@graphics-icon/vite-umbrella` = packages/vite-plugin)
+## 结构(引擎-only 私有包 `color-fonts`,Vite 插件在 `@graphics-icon/vite-umbrella` = packages/vite-plugin)
 - `src/`(引擎):`index.ts` 入口(`exports["."]` = 源码,非 dist),`pipeline/`、`glyf/`、`colrv1/`、
   `flavors/`、`emit/`、`encode/`、`outline/`、`codepoints/`、`cache/`、`workers/`、`util/` 等。
-- Vite 插件薄封装在私有包 `@graphics-icon/vite-umbrella`(`packages/vite-plugin`,仅含伞插件),从 `@codejoo/colorfont` 导入引擎;
+- Vite 插件薄封装在私有包 `@graphics-icon/vite-umbrella`(`packages/vite-plugin`,仅含伞插件),从 `color-fonts` 导入引擎;
   对外发布物是 `graphics-icon`(`packages/exports`),再导出伞插件为 `graphics-icon/vite`、引擎为 `graphics-icon/colorfont`。
 - `src/cli/`:build/watch/check。`run(argv)` 在 `cli/cli.ts`,经 index 以 **`runCli`** 再导出(供发布包 bin
   `color-fonts` 复用)。引擎双形态:`build`/`buildAndWrite`/`colorfonts`(可编程)+ `runCli`(CLI)。

@@ -23,7 +23,8 @@ async function encodeFont(
   else if (format === 'woff2') source = await toWoff2(ttf, o.woff2Quality)
   else source = toWoff(ttf)
   const hash = contentHash(source)
-  return { fileName: `${o.fontName}.${color}.${hash}.${format}`, source, color, format, hash }
+  // 文件名不带内容指纹(稳定名,便于引用/缓存复用);hash 仍保留在 asset 上供需要处使用。
+  return { fileName: `${o.fontName}.${color}.${format}`, source, color, format, hash }
 }
 
 /** 构建某一档的 SFNT(TTF)字节。各写表器直接消费预计算的 PreparedIcon(不再 toOutline)。 */

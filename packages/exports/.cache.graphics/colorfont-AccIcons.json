@@ -1,19 +1,19 @@
 {
   "configHash": "dfffab26e4383e2a5fa205c1d9e8d552f9192906c0c76ba2031c5e5087b66213",
   "files": {
-    "../colorfont/fixtures/arrow-left.svg": "368d8f11b8808cf53f144551bce9d5667221e224efb1cec78c977950250677b4",
-    "../colorfont/fixtures/badge-grad.svg": "62299bc642267a4d82745a5cd650cb43540fe377b270bac15842ebd94607c7d4",
-    "../colorfont/fixtures/home.svg": "6a6f4002613dbb8bd4f90a7d987a367c7b882acf7237eb1b549a50cdb95b18e5",
-    "../colorfont/fixtures/logo-color.svg": "52098c2c8b9cda572d5b2e59cbc40d52ef745a23a10dc12596bfe4fbc8f8cd41",
-    "../colorfont/fixtures/star.svg": "8123ed91285d84cfdb52f3d595abac465f3362918fd0c1a53dd00b4e624675ce"
+    "../color-fonts/fixtures/arrow-left.svg": "368d8f11b8808cf53f144551bce9d5667221e224efb1cec78c977950250677b4",
+    "../color-fonts/fixtures/badge-grad.svg": "62299bc642267a4d82745a5cd650cb43540fe377b270bac15842ebd94607c7d4",
+    "../color-fonts/fixtures/home.svg": "6a6f4002613dbb8bd4f90a7d987a367c7b882acf7237eb1b549a50cdb95b18e5",
+    "../color-fonts/fixtures/logo-color.svg": "52098c2c8b9cda572d5b2e59cbc40d52ef745a23a10dc12596bfe4fbc8f8cd41",
+    "../color-fonts/fixtures/star.svg": "8123ed91285d84cfdb52f3d595abac465f3362918fd0c1a53dd00b4e624675ce"
   },
   "outputs": [
-    "test/app/.gen/AccIcons.colrv0.c1a7198c.woff2",
-    "test/app/.gen/AccIcons.colrv1.d5733c88.woff2",
+    "test/app/.gen/AccIcons.colrv0.woff2",
+    "test/app/.gen/AccIcons.colrv1.woff2",
     "test/app/.gen/AccIcons.css",
-    "test/app/.gen/AccIcons.mono.7d089a8a.woff2",
-    "test/app/.gen/AccIcons.otsvg.aee32882.woff2",
+    "test/app/.gen/AccIcons.mono.woff2",
+    "test/app/.gen/AccIcons.otsvg.woff2",
     "test/app/.gen/AccIcons.ts"
   ],
-  "hash": "3cbe9d9498e7fdc0e6745cf523b9e1e0a19c9891d2c994d4c3a1f7177e3f9494"
+  "hash": "535d73f7345640add8d04bc53b3f80d996bcde0510f9adef9cb7c122dd8dde59"
 }
