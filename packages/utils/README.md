@@ -20,7 +20,7 @@
 
 ## 两个关键设计
 
-**共享缓存目录**：所有缓存默认落在仓库根 `.cache.graphics/`。多实例引擎（svg/bitmap/colorfont）经统一 `groupCache` 按 `items[]` 项各存一份（文件名 Vite 用 `cacheName`、独立用 `cacheFilename`，省略则从该项产物派生）；单例 `imagemin` 默认 `imagemin.json`。底层 `resolveCacheFile(name, custom?)` 支持：省略→默认名；裸文件名→仍落共享目录；含路径分隔符→完全自定义位置。
+**共享缓存目录**：所有缓存默认落在仓库根 `.cache.graphics/`。多实例引擎（svg/bitmap/colorfont）经统一 `groupCache` 按 `items[]` 项各存一份（文件名 Vite 用 `cacheName`、独立用 `cacheFilename`，省略则从该项产物派生）；单例 `imagemin` 默认 `imagemin.json`。底层 `resolveCacheFile(name, custom?)` 支持：省略→默认名；裸文件名→仍落共享目录；含路径分隔符→完全自定义位置。注意 `groupCache` 内的输入/产物路径以 `process.cwd()` 为根锚定，请从**仓库根**运行构建,跨目录运行会让缓存口径漂移。
 
 **按需加载**：重依赖（`svgo` / `svgpath` / `scale-that-svg`）全部在 `scale-svg` 内部 `await import()` 动态加载——只有真正调用缩放函数时才加载，未用到的代码路径不占内存。配合子路径导出，可只拉取所需模块。
 
@@ -50,6 +50,6 @@ All functions shared by the engines (`colorfont`, `bitmap-icons`, `svg-icons`, `
 
 ### Two key design points
 
-**Shared cache folder** — every cache defaults into `.cache.graphics/` at the repo root. Multi-instance engines (svg/bitmap/colorfont) store one cache per `items[]` entry via the unified `groupCache` (filename from `cacheName` in Vite / `cacheFilename` standalone, else derived from that entry's products); the `imagemin` singleton defaults to `imagemin.json`. The underlying `resolveCacheFile(name, custom?)` supports: omitted → default name; bare filename → still in the shared folder; path with separators → fully custom location.
+**Shared cache folder** — every cache defaults into `.cache.graphics/` at the repo root. Multi-instance engines (svg/bitmap/colorfont) store one cache per `items[]` entry via the unified `groupCache` (filename from `cacheName` in Vite / `cacheFilename` standalone, else derived from that entry's products); the `imagemin` singleton defaults to `imagemin.json`. The underlying `resolveCacheFile(name, custom?)` supports: omitted → default name; bare filename → still in the shared folder; path with separators → fully custom location. Note: `groupCache` anchors input/product paths to `process.cwd()`, so run builds **from the repo root** — running elsewhere drifts the cache key.
 
 **On-demand loading** — heavy deps (`svgo` / `svgpath` / `scale-that-svg`) are `await import()`-ed inside `scale-svg`: loaded only when a scaling function actually runs, so unused paths allocate nothing. Combined with subpath exports, you pull only what you use.

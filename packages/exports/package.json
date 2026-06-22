@@ -1,6 +1,6 @@
 {
   "name": "graphics-icon",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "license": "MIT",
   "description": "Icon/image build toolkit: color icon webfont + bitmap sprite sheets + SVG symbol sprites + imagemin. Vite plugin (graphics-icon/vite) + standalone engines/CLI per subpath (graphics-icon/bitmap, /svg, /imagemin, /colorfont), with per-instance caching and on-demand loading.",
@@ -46,13 +46,18 @@
     "./colorfont": {
       "types": "./dist/colorfont.d.ts",
       "import": "./dist/colorfont.js"
+    },
+    "./unused": {
+      "types": "./dist/unused.d.ts",
+      "import": "./dist/unused.js"
     }
   },
   "bin": {
-    "g-min": "./dist/bin.js",
-    "g-bitmap": "./dist/bin-bitmap.js",
-    "g-svg": "./dist/bin-svg.js",
-    "g-colorfont": "./dist/bin-colorfont.js"
+    "color-fonts": "./dist/bin-colorfont.js",
+    "svg-icons": "./dist/bin-svg.js",
+    "bitmap-icons": "./dist/bin-bitmap.js",
+    "image-min": "./dist/bin.js",
+    "remove-unused": "./dist/bin-unused.js"
   },
   "files": [
     "dist",

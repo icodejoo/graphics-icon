@@ -10,7 +10,7 @@
  *   image-min --all --config ./imagemin.config.ts  # 用项目配置覆盖默认值
  *
  * 只「压缩 + 更新缓存」，不碰 git。/ Only compresses + updates cache; never touches git.
- * 编程调用见库导出 `gMin(argv?)`。/ For programmatic use, import `gMin(argv?)` from the package root.
+ * 编程调用见子路径 `graphics-icon/imagemin` 的 `runCli`。/ For programmatic use, import `runCli` from `graphics-icon/imagemin`.
  */
 
 import { runCli } from '@codejoo/imagemin'

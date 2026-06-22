@@ -47,6 +47,13 @@ color-fonts build --input icons --out fonts --name AppIcons   # 另有 watch / c
 color-fonts check   # 校验码位锁稳定（CI / pre-commit）
 ```
 
+## 注意 / Caveats
+
+- **码位锁内容不参与构建缓存键**：`<fontName>.codepoints.json` 是「状态」而非缓存产物，其内容**不计入**构建缓存指纹。请**勿手改**——手改后缓存可能仍命中，从而继续供给旧字体。若需强制重建，请用 `cache:false`。
+  The codepoint lock's content is **not part of the build cache key**: `<fontName>.codepoints.json` is state, not a cache product, so editing it by hand won't invalidate the cache — a stale hit may keep serving the old font. Use `cache:false` to force a rebuild.
+- **缓存路径相对 `process.cwd()` 锚定**：构建缓存（`.cache.graphics/`）的相对路径以 `process.cwd()` 为根。请**从仓库根运行构建**;跨目录运行会让缓存口径漂移(同一份输入在不同 cwd 下算出不同相对路径 → 误判 miss/hit)。
+  Cache paths are anchored to `process.cwd()`: run the build **from the repo root**. Running from a different directory drifts the cache key (the same inputs resolve to different relative paths).
+
 ## 导出 API / Exports
 
 | API | 类型 | 作用 |

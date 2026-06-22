@@ -16,7 +16,7 @@
  *   export default defineConfig({
  *     plugins: [
  *       svgIconsVite({
- *         sprites: [
+ *         items: [
  *           {
  *             input: "src/assets/icons",
  *             output: {

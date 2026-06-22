@@ -45,7 +45,14 @@ export async function buildFlavors(
     return out
   }
   const per = await Promise.all(
-    flavors.map((f) => runInWorker(f, icons, o).catch(() => buildFlavorAssets(f, icons, o))),
+    flavors.map((f) =>
+      runInWorker(f, icons, o).catch((e) => {
+        // worker 失败 → 告警被吞的 error 后回退主线程同步构建(保证正确性,便于排查)。
+        // Worker failed → warn the swallowed error, then fall back to synchronous main-thread build.
+        console.warn(`[colorfont] ${f} 档 worker 失败,已回退主线程同步构建:\n${String(e)}`)
+        return buildFlavorAssets(f, icons, o)
+      }),
+    ),
   )
   return per.flat()
 }

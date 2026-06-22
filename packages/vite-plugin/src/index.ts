@@ -129,6 +129,31 @@ function colorfontsVite(opts: ColorfontPluginOptions): Plugin {
   }
   const affects = (file: string): boolean => file.toLowerCase().endsWith('.svg') && underAny(file, inputDirs)
 
+  // in-flight 合并:watchChange 与 handleHotUpdate 可能为同一次保存并发触发 →
+  // 同一时刻只跑一次,进行中再来的触发尾随一次,避免并发写同一产物 + 缓存。
+  // In-flight coalescing: dedupe concurrent watchChange/handleHotUpdate; run once, tail one rerun.
+  let running: Promise<void> | null = null
+  let pending = false
+  const regenerate = (): Promise<void> => {
+    if (running) {
+      pending = true
+      return running
+    }
+    running = (async () => {
+      try {
+        await run()
+        while (pending) {
+          pending = false
+          await run()
+        }
+      } finally {
+        running = null
+        pending = false
+      }
+    })()
+    return running
+  }
+
   return {
     name: 'graphics-icon:colorfont',
     configResolved(config: { command?: string }) {
@@ -138,10 +163,10 @@ function colorfontsVite(opts: ColorfontPluginOptions): Plugin {
       await run()
     },
     async watchChange(id: string) {
-      if (watch !== false && affects(id)) await run()
+      if (watch !== false && affects(id)) await regenerate()
     },
     async handleHotUpdate(ctx: { file: string }) {
-      if (watch !== false && affects(ctx.file)) await run()
+      if (watch !== false && affects(ctx.file)) await regenerate()
     },
   } as Plugin
 }

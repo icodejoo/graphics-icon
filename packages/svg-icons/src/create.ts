@@ -25,7 +25,7 @@ import type { GroupInput } from "@codejoo/utils/cache"
 import type { Plugin } from "vite"
 
 // 生成器版本：改后处理逻辑/产物结构/缓存模型时 +1,使旧缓存失效。
-const GENERATOR_VERSION = "5"
+const GENERATOR_VERSION = "6"
 
 // 函数无法稳定序列化 → 用 toString() 参与指纹（改了颜色函数即视为配置变化）。
 function serializeColor(c: ColorOption): string {
@@ -63,11 +63,9 @@ function readInputs(input: string): GroupInput[] {
   rels.sort()
   const out: GroupInput[] = []
   for (const rel of rels) {
-    try {
-      out.push({ path: resolve(dir, rel), content: readFileSync(resolve(dir, rel)) })
-    } catch {
-      /* 读不到就略过（下次仍会 miss） */
-    }
+    // 读失败直接传播（由 svgIcons() runner 的 throwable 接管），不再静默吞掉。
+    // Propagate read failures (handled by svgIcons() runner's throwable); no silent swallow.
+    out.push({ path: resolve(dir, rel), content: readFileSync(resolve(dir, rel)) })
   }
   return out
 }
@@ -95,12 +93,18 @@ function cacheFileOf(item: SvgIconsItem): string {
 
 /** 单实例生成(经 groupCache)。返回是否命中。 / Generate one instance via groupCache; returns hit. */
 async function generateOne(item: SvgIconsItem, underlyingBuildStart?: () => Promise<void>): Promise<boolean> {
+  // 输入只读一次，复用进 groupCache（避免读两遍）。空输入 → 抛错（由 svgIcons() runner 的 throwable 接管）。
+  // Read inputs once and reuse. Empty input → throw (handled by svgIcons() runner's throwable).
+  const inputs = readInputs(item.input)
+  if (inputs.length === 0) {
+    throw new Error(`[svg-icons] 输入目录未找到任何 .svg: ${item.input}\n[svg-icons] no .svg files found in input dir: ${item.input}`)
+  }
   const r = await groupCache(
     {
       cacheFile: cacheFileOf(item),
       cache: item.cache !== false,
       configHash: configHashOf(item),
-      inputs: readInputs(item.input),
+      inputs,
       representative: item.output.svg, // sprite svg 必产 → 代表产物
     },
     async () => {
@@ -157,16 +161,40 @@ export function svgIconsVite(options: SvgIconsOptions): Plugin {
       return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
     })
   }
+  // in-flight 合并:watchChange 与 handleHotUpdate 可能为同一次保存并发触发 →
+  // 同一时刻只跑一次,进行中再来的触发尾随一次,避免并发写同一产物 + 缓存。
+  // In-flight coalescing: dedupe concurrent watchChange/handleHotUpdate; run once, tail one rerun.
+  let running: Promise<void> | null = null
+  let pending = false
+  const regenerate = (): Promise<void> => {
+    if (running) {
+      pending = true
+      return running
+    }
+    running = (async () => {
+      try {
+        await svgIcons(options)
+        while (pending) {
+          pending = false
+          await svgIcons(options)
+        }
+      } finally {
+        running = null
+        pending = false
+      }
+    })()
+    return running
+  }
   return {
     name: "vite-plugin-svg-icons",
     async buildStart() {
       await svgIcons(options)
     },
     async watchChange(id) {
-      if (affects(id)) await svgIcons(options)
+      if (affects(id)) await regenerate()
     },
     async handleHotUpdate({ file }) {
-      if (affects(file)) await svgIcons(options)
+      if (affects(file)) await regenerate()
     },
   }
 }

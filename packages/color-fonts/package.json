@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "smoke": "node scripts/smoke.ts",
-    "test": "node test/cli.test.ts",
+    "test": "node --experimental-strip-types test/cli.test.ts && node --experimental-strip-types colorfont.test.ts",
     "build": "tsup && node scripts/copy-wasm.mjs"
   },
   "dependencies": {

@@ -1,6 +1,8 @@
 // bitmap-icons 多实例 + groupCache 集成自测(用 sharp 现造小 PNG)。Node 24 直接跑 .ts。
-import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { resolve } from "node:path"
+
+import { autoGenBanner } from "@codejoo/utils/banner"
 
 import { bitmapIcons } from "./src/generate-sheet.ts"
 
@@ -49,6 +51,9 @@ const opts = (cache = true) => ({
 
 await capture(() => bitmapIcons(opts()))
 check(existsSync("out/sheet.webp") && existsSync("out/sheet.css") && existsSync("out/sheet.ts") && existsSync("out/sheet.json"), "all products (webp+css+ts+json) generated")
+// banner 校验:css 首部含 block 注释 banner;ts 入口含 line 注释 banner。
+check(readFileSync("out/sheet.css", "utf8").startsWith(autoGenBanner("block")), "banner: css 首部含 block 注释 banner")
+check(readFileSync("out/sheet.ts", "utf8").includes(autoGenBanner("line").trim()), "banner: ts 含 line 注释 banner")
 const cacheFile = resolve(root, ".cache.graphics/bitmap-icons-sheet.json")
 check(existsSync(cacheFile), "per-instance cache file written (bitmap-icons-sheet.json)")
 check(!hadHit(), "1st run = miss")
@@ -68,6 +73,44 @@ check(existsSync("out/sheet.css"), "deleted product restored")
 await capture(() => bitmapIcons(opts(false)))
 check(!hadHit(), "cache:false = miss")
 check(existsSync("out/sheet.webp") && existsSync(cacheFile), "cache:false rebuilt products + cache")
+
+// ── 空输入 + 清理陈旧产物 ──
+// 捕获 warn,判定是否抛出
+let warns: string[] = []
+const origWarn = console.warn
+const captureWarn = async (fn: () => Promise<void>): Promise<{ threw: boolean }> => {
+  warns = []
+  console.warn = (...a: unknown[]) => {
+    warns.push(a.join(" "))
+  }
+  let threw = false
+  try {
+    await fn()
+  } catch {
+    threw = true
+  } finally {
+    console.warn = origWarn
+  }
+  return { threw }
+}
+const hadWarn = (kw: string): boolean => warns.some((l) => l.includes(kw))
+
+// (c) 先有一张 sheet(此时 out/ 与 cache 已存在),清空源目录重跑 → 旧产物 + 缓存 json 被清理。
+rmSync("out", { recursive: true, force: true })
+await capture(() => bitmapIcons(opts())) // 重建一张全新 sheet + cache
+check(existsSync("out/sheet.webp") && existsSync(cacheFile), "fresh sheet + cache before emptying")
+rmSync("imgs", { recursive: true, force: true })
+mkdirSync("imgs", { recursive: true }) // 空源目录
+const r3 = await captureWarn(() => bitmapIcons(opts()))
+check(r3.threw, "(a) empty input default throws")
+check(!existsSync("out/sheet.webp") && !existsSync("out/sheet.css") && !existsSync("out/sheet.ts") && !existsSync("out/sheet.json"), "(c) stale products cleaned on empty input")
+check(!existsSync(cacheFile), "(c) stale cache json cleaned on empty input")
+
+// (b) throwable:false → warn 不抛且返回。
+const optsNoThrow = { ...opts(), items: [{ ...opts().items[0], throwable: false }] }
+const r5 = await captureWarn(() => bitmapIcons(optsNoThrow))
+check(!r5.threw, "(b) throwable:false does not throw")
+check(hadWarn("无可打包图片"), "(b) throwable:false warns")
 
 process.chdir(resolve(root, ".."))
 rmSync(root, { recursive: true, force: true })

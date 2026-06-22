@@ -1,6 +1,8 @@
 // svg-icons 多实例 + groupCache 集成自测。Node 24 直接跑 .ts。
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
+
+import { autoGenBanner } from "@codejoo/utils/banner"
 
 import { svgIcons } from "./src/create.ts"
 
@@ -48,6 +50,11 @@ const opts = (cache = true) => ({
 await capture(() => svgIcons(opts()))
 check(existsSync("out/icons.svg"), "sprite svg generated")
 check(existsSync("out/icons.ts"), "script generated")
+// banner 校验:sprite svg 含 xml banner(<?xml?> 序言后或最前);ts 入口首部含 line banner。
+const svgText = readFileSync("out/icons.svg", "utf8")
+const tsText = readFileSync("out/icons.ts", "utf8")
+check(svgText.includes(autoGenBanner("xml").trim()), "banner: sprite svg 含 xml 注释 banner")
+check(tsText.startsWith(autoGenBanner("line")), "banner: 入口 ts 首部含 line 注释 banner")
 const cacheFile = resolve(root, ".cache.graphics/svg-icons-icons.json")
 check(existsSync(cacheFile), "per-instance cache file written (svg-icons-icons.json)")
 check(!hadHit(), "1st run = miss")
@@ -70,6 +77,39 @@ check(existsSync("out/icons.ts"), "deleted product restored")
 await capture(() => svgIcons(opts(false)))
 check(!hadHit(), "cache:false = miss")
 check(existsSync("out/icons.svg") && existsSync(cacheFile), "cache:false rebuilt products + cache")
+
+// ── 空输入 ──
+// 捕获 warn,判定是否抛出
+let warns: string[] = []
+const origWarn = console.warn
+const captureWarn = async (fn: () => Promise<void>): Promise<{ threw: boolean }> => {
+  warns = []
+  console.warn = (...a: unknown[]) => {
+    warns.push(a.join(" "))
+  }
+  let threw = false
+  try {
+    await fn()
+  } catch {
+    threw = true
+  } finally {
+    console.warn = origWarn
+  }
+  return { threw }
+}
+
+// 空输入目录:默认抛错
+mkdirSync("empty", { recursive: true })
+const emptyOpts = (throwable?: boolean) => ({
+  color: true as const,
+  items: [{ input: "empty", output: { svg: "out/empty.svg", script: "out/empty.ts" }, ...(throwable === undefined ? {} : { throwable }) }],
+})
+const e1 = await captureWarn(() => svgIcons(emptyOpts()))
+check(e1.threw, "empty input default throws")
+
+// throwable:false → 不抛(告警续跑)
+const e2 = await captureWarn(() => svgIcons(emptyOpts(false)))
+check(!e2.threw, "empty input throwable:false does not throw")
 
 process.chdir(resolve(root, ".."))
 rmSync(root, { recursive: true, force: true })

@@ -11,7 +11,7 @@
  *   · sharp / maxrects-packer 在 regenerate 内按需动态 import —— 命中或仅导入工厂时不加载这些重依赖。
  */
 
-import { globSync, readFileSync } from "node:fs"
+import { globSync, readFileSync, rmSync } from "node:fs"
 import { basename, extname, resolve } from "node:path"
 
 import { groupCache, resolveCacheFile } from "@codejoo/utils/cache"
@@ -28,7 +28,7 @@ import type { GroupInput } from "@codejoo/utils/cache"
 const SUPPORTED = /\.(png|jpe?g|webp|avif)$/i
 const OUTPUT_NAMING = /\.sprite\.(png|jpe?g|webp|avif)$/i // 产物命名约定 → 永不当作源
 // 产物格式版本:改变生成内容(如样式/脚本结构)或缓存模型时 +1,使旧缓存失效。
-const GENERATOR_VERSION = "4"
+const GENERATOR_VERSION = "5"
 
 /** maxrects 矩形:addArray 后由 place() 就地写入 x/y。 */
 interface Entry {
@@ -72,6 +72,32 @@ function cacheFileOf(item: BitmapIconsItem): string {
 }
 
 /**
+ * 清理某实例上一轮残留产物 + 缓存 json(源图清空时调用)。
+ * 缓存 json 结构 { outputs: string[], ... },outputs 为「仓库根相对」路径(参考 cache.ts 的 toRepoRel);
+ * 需 resolve 回绝对再删。读不到缓存 json(首次就空)→ 无需清理。删除一律容错,不让清理本身崩。
+ * Clean a previous run's stale products + cache json (when sources are emptied).
+ * Cache json is { outputs: string[], ... } with repo-root-relative paths; resolve back to absolute before deleting.
+ * No cache json (empty on first run) → nothing to clean. Deletions are fault-tolerant.
+ */
+function cleanupStaleOutputs(cacheFile: string): void {
+  let prev: { outputs?: string[] } | null = null
+  try {
+    prev = JSON.parse(readFileSync(cacheFile, "utf8")) as { outputs?: string[] }
+  } catch {
+    return // 读不到/解析失败 → 无可清理 / unreadable → nothing to clean
+  }
+  const rmIfExists = (abs: string): void => {
+    try {
+      rmSync(abs, { force: true })
+    } catch {
+      /* 删除失败容错,不崩 / tolerate deletion failure */
+    }
+  }
+  if (prev?.outputs) for (const rel of prev.outputs) rmIfExists(resolve(process.cwd(), rel))
+  rmIfExists(cacheFile)
+}
+
+/**
  * 生成单张图集(经 groupCache)。返回是否命中缓存。
  * Generate one sheet via groupCache; returns whether it was a cache hit.
  */
@@ -102,6 +128,12 @@ export async function generateSheet(item: BitmapIconsItem): Promise<boolean> {
     .filter((rel) => SUPPORTED.test(rel) && !OUTPUT_NAMING.test(rel) && !matchesAnyGlob(rel, exclude) && !ownOut.has(resolve(inputAbs, rel)))
     .sort()
   if (selected.length === 0) {
+    // 源图全删/为空 → 清理上一轮残留产物 + 缓存 json,避免下游仍 import 旧图。
+    // Source emptied → wipe last run's stale products + cache json so downstream stops importing the old sheet.
+    cleanupStaleOutputs(cacheFileOf(item))
+    if (item.throwable !== false) {
+      throw new Error(`[bitmap-icons] 输入目录无可打包图片: ${inputDir}\n[bitmap-icons] no packable images in input dir: ${inputDir}`)
+    }
     console.warn(`[bitmap-icons] ${inputDir} 无可打包图片,跳过`)
     return false
   }
@@ -122,7 +154,9 @@ export async function generateSheet(item: BitmapIconsItem): Promise<boolean> {
     async () => {
       // ── 未命中:measure → pack → compose → encode → emit ──
       const sharp = (await import("sharp")).default
-      const entries: Entry[] = []
+      // 先做廉价的命名/重名校验(顺序确定,错误可复现);通过后再并行测量尺寸。
+      // Cheap naming/dup validation first (deterministic, reproducible errors), then measure in parallel.
+      const named: { f: (typeof files)[number]; name: string }[] = []
       const seen = new Map<string, string>()
       for (const f of files) {
         const name = nameOf(basename(f.rel, extname(f.rel)))
@@ -130,15 +164,22 @@ export async function generateSheet(item: BitmapIconsItem): Promise<boolean> {
         const prev = seen.get(name)
         if (prev) throw new Error(`[bitmap-icons] 精灵名冲突 "${name}":${prev} 与 ${f.rel}`)
         seen.set(name, f.rel)
-        let meta: Metadata
-        try {
-          meta = await sharp(f.buf).metadata()
-        } catch {
-          throw new Error(`[bitmap-icons] 无法读取为图片:${f.rel}`)
-        }
-        if (!meta.width || !meta.height) throw new Error(`[bitmap-icons] 读不到尺寸:${f.rel}`)
-        entries.push({ width: meta.width, height: meta.height, x: 0, y: 0, name, buf: f.buf })
+        named.push({ f, name })
       }
+      // 并行读取尺寸:逐张 sharp().metadata() 互相独立 → Promise.all 并行(catch 带上原始 sharp 错误)。
+      // Parallel metadata reads; each is independent. Preserve the original sharp error in the catch.
+      const entries: Entry[] = await Promise.all(
+        named.map(async ({ f, name }) => {
+          let meta: Metadata
+          try {
+            meta = await sharp(f.buf).metadata()
+          } catch (e) {
+            throw new Error(`[bitmap-icons] 无法读取为图片:${f.rel}(${String(e)})`)
+          }
+          if (!meta.width || !meta.height) throw new Error(`[bitmap-icons] 读不到尺寸:${f.rel}`)
+          return { width: meta.width, height: meta.height, x: 0, y: 0, name, buf: f.buf }
+        }),
+      )
 
       const { MaxRectsPacker } = await import("maxrects-packer")
       const packer = new MaxRectsPacker<Entry>(maxWidth, maxHeight, padding, { smart: true, pot, square, allowRotation: false, border: 0 })
@@ -159,7 +200,9 @@ export async function generateSheet(item: BitmapIconsItem): Promise<boolean> {
       writeBufferIfChanged(resolve(output.image), await encoded.toBuffer())
 
       const manifest: IconManifest = {}
-      for (const r of [...bin.rects].sort((a, b) => a.name.localeCompare(b.name))) {
+      // locale 无关的码点序排序,保证 manifest 顺序跨机器/locale 可复现。
+      // Locale-independent codepoint-order sort for reproducible manifest across machines/locales.
+      for (const r of [...bin.rects].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
         manifest[r.name] = { x: r.x, y: r.y, width: r.width, height: r.height }
       }
       const sheet: IconSheetMeta = { width: bin.width, height: bin.height, pixelRatio }

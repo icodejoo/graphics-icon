@@ -60,10 +60,28 @@ function resolveFlavors(cf: ColorFormat, anyColor: boolean): { flavors: FontFlav
   return { flavors, warnings }
 }
 
-/** 纯函数:输入图标 + 选项 → 产物 Buffer + 元数据 + CSS/TS 生成器。不落盘、无缓存(缓存在 buildAndWrite)。 */
-export async function build(options: ColorfontItem): Promise<BuildResult> {
+/**
+ * 纯函数:输入图标 + 选项 → 产物 Buffer + 元数据 + CSS/TS 生成器。不落盘、无缓存(缓存在 buildAndWrite)。
+ * `preloaded`(可选):绝对路径 → svg 内容,由 buildAndWrite 透传已读到的 buffer,避免 loadIcons 二次磁盘读 + 二次 hash。
+ * 对外签名向后兼容(新增可选入参,既有 CLI/调用方不受影响)。
+ * Optional `preloaded` (abs path → svg content) lets buildAndWrite pass through buffers it already read,
+ * avoiding a second disk read + hash in loadIcons. Signature stays backward-compatible.
+ */
+export async function build(options: ColorfontItem, preloaded?: Map<string, string>): Promise<BuildResult> {
   const o = resolveOptions(options)
-  const icons = await loadIcons(o.input)
+  const icons = await loadIcons(o.input, preloaded)
+
+  // 空输入即视为失败:静默产出空字体几乎总是误配(输入路径错/目录空)。
+  // 抛出后经 buildAndWrite→colorfonts runner 的 try/catch 按 throwable 处理(默认抛、false 告警);
+  // CLI 直接调用时也会正常冒泡。
+  // Empty input is treated as a failure: a silently-empty font is almost always a misconfig
+  // (wrong path / empty dir). The throw propagates via the runner's throwable handling.
+  if (icons.length === 0) {
+    throw new Error(
+      `colorfont: 输入目录未找到任何 .svg 图标: ${o.input.join(', ')}\n` +
+        `colorfont: no .svg icons found in input dir(s): ${o.input.join(', ')}`,
+    )
+  }
 
   const lock = await readLockfile(o.codepointsFile, o.paStart)
   const cpMap = assignCodepoints(
@@ -136,7 +154,7 @@ export async function build(options: ColorfontItem): Promise<BuildResult> {
 }
 
 // 引擎缓存版本:改产物格式 / 缓存模型时 +1。
-const COLORFONT_CACHE_VERSION = 'colorfont-cache-v2'
+const COLORFONT_CACHE_VERSION = 'colorfont-cache-v3'
 
 /** 影响产物的配置指纹(不含图标内容,那在 groupCache.files 里)。 */
 function configHashOf(o: ResolvedOptions): string {
@@ -154,27 +172,33 @@ function configHashOf(o: ResolvedOptions): string {
       formats: [...o.formats].sort(),
       colrv0: o.colrv0,
       woff2Quality: o.woff2Quality,
+      paStart: o.paStart,
     }),
   )
 }
 
-/** 读取源 svg(各 input 目录,按名排序)→ GroupInput[]。 */
+/**
+ * 读取源 svg(各 input 目录,按名排序)→ GroupInput[]。
+ * 注意:必须与 loadIcons 的扫描口径一致 —— loadIcons 用 readdir(**仅顶层,非递归**),
+ * 故这里也用非递归 `*.svg`。否则子目录的 svg 会进缓存指纹却不进字体,导致改子目录触发无谓重建、
+ * 或指纹与实际构建集合脱节。
+ */
 function readSvgInputs(inputs: string[]): GroupInput[] {
   const out: GroupInput[] = []
   for (const dir of inputs) {
     let rels: string[] = []
     try {
-      rels = globSync('**/*.svg', { cwd: dir })
+      rels = globSync('*.svg', { cwd: dir })
     } catch {
       rels = []
     }
     rels.sort()
     for (const rel of rels) {
-      try {
-        out.push({ path: resolve(dir, rel), content: readFileSync(resolve(dir, rel)) })
-      } catch {
-        /* 读不到就略过(下次仍 miss) */
-      }
+      // 不吞读失败:glob 已确认文件存在,此处读失败属真异常 → 抛出传播(经 runner 的 throwable 接管),
+      // 避免静默丢图标导致缓存指纹与实际构建集合脱节。目录级 glob 失败仍按空目录处理(见上)。
+      // Don't swallow read failures: glob already listed the file, so a read error here is a real fault →
+      // let it propagate (handled by the runner's throwable). Only directory-level glob failure → empty dir.
+      out.push({ path: resolve(dir, rel), content: readFileSync(resolve(dir, rel)) })
     }
   }
   return out
@@ -196,16 +220,21 @@ export async function buildAndWrite(options: ColorfontItem): Promise<BuildResult
   const cssPath = join(o.outDir, `${o.fontName}.css`)
   let captured: BuildResult | null = null
 
+  // 一次读取:既用于缓存指纹,也透传给 build()/loadIcons 复用(避免未命中时二次磁盘读 + 二次 hash)。
+  // Read inputs once: used for the cache fingerprint and passed through to build()/loadIcons on a miss.
+  const inputs = readSvgInputs(o.input)
+  const preloaded = new Map<string, string>(inputs.map((i) => [resolve(i.path), typeof i.content === 'string' ? i.content : i.content.toString('utf8')]))
+
   const r = await groupCache(
     {
       cacheFile: resolveCacheFile(`colorfont-${o.fontName}`, options.cacheFilename),
       cache: o.cache,
       configHash: configHashOf(o),
-      inputs: readSvgInputs(o.input),
+      inputs,
       representative: cssPath, // .css 必产 → 代表产物
     },
     async () => {
-      const result = await build(options) // 纯构建(无缓存)
+      const result = await build(options, preloaded) // 纯构建(无缓存),复用已读 buffer
       captured = result
       await mkdir(o.outDir, { recursive: true })
       // 产物(字节)交给 groupCache 幂等落盘;码位锁单独写(非缓存产物)。

@@ -46,6 +46,7 @@
     "tsup": "^8.0.0"
   },
   "scripts": {
-    "build": "tsup"
+    "build": "tsup",
+    "test": "node --experimental-strip-types unused.test.ts"
   }
 }

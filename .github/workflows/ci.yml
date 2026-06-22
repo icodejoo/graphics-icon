@@ -1,0 +1,74 @@
+# CI:引擎/utils 包的测试。Node 24 用 `node --experimental-strip-types` 直接跑 *.test.ts(无需编译/转译)。
+#
+# wasm / Rust 说明(重要):
+#   · colorfont 的 woff2(ttf2woff2)与 colrv1 写表后端是 Rust→wasm。
+#   · 这些 wasm 产物已**提交进仓库**:
+#       - packages/color-fonts/woff2-wasm/pkg/woff2_writer*.{js,wasm}      ← woff2 测试依赖,已提交
+#       - packages/color-fonts/colrv1-writer/pkg/colrv1_writer*.{js,wasm}  ← 已提交
+#     源码用 import.meta.url 相对加载这些 pkg(见 src/encode/to-woff2.ts、src/colrv1/wasm-writer.ts),
+#     故 **CI 无需安装 Rust / wasm-pack 即可跑 woff2 与全部以 src 为入口的测试**。
+#   · colrv1 引擎在 wasm 不可用时**优雅降级**(isColrv1Available() 返回 false → 仅告警,仍产 colrv0+otsvg)。
+#     现有测试不硬依赖「现编」colrv1 wasm:colorfont.test.ts 的多色结构断言走 COLRv0(COLR+CPAL)与 OT-SVG('SVG ')档,
+#     不需要 colrv1。若将来新增**必须现编 wasm**的用例,请在此 CI 中跳过并注释说明(本仓库目前无此类用例)。
+#   · 因此本 CI 不含 Rust 工具链,且必须在无 Rust 环境下保持绿。
+#
+# 范围:`test` job 跑引擎/utils 包(color-fonts / bitmap-icons / svg-icons / imagemin / utils / unused);
+#   发布伞包 `graphics-icon`(packages/exports)单列 `acceptance` job:先 `pnpm build`(tsup + copy-wasm,wasm 已
+#   提交无需 Rust)产出 dist,再跑 acceptance + acceptance-dist(发布形态真实 vite build 验收)。两 job 并行,
+#   引擎测试不被发布物构建状态阻塞,同时发布物本身也进 CI。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 跑引擎/utils 包测试(发布伞包 graphics-icon 见下方 acceptance job)。
+      # 各包 test = `node --experimental-strip-types <pkg>.test.ts`,用提交进仓库的 woff2 wasm,无需 Rust。
+      - name: Run engine tests
+        run: pnpm --filter "!graphics-icon" -r test
+
+  # 发布伞包:构建发布形态(dist + wasm)后跑验收,确保对外产物本身可用。与 test job 并行。
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # build = tsup + copy-wasm(拷贝已提交的 woff2/colrv1 wasm 进 dist),无需 Rust;再跑 acceptance + acceptance-dist。
+      - name: Build & test published package
+        run: pnpm --filter graphics-icon build && pnpm --filter graphics-icon test

@@ -13,14 +13,33 @@
  *   · Keys are written sorted so git diffs stay stable.
  */
 
-import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { createHash, randomBytes } from "node:crypto"
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, relative, resolve } from "node:path"
 
 import { writeBufferIfChanged, writeTextIfChanged } from "./fs-write.ts"
 
 /** 共享缓存文件夹(相对仓库根)。 / Shared cache folder (relative to repo root). */
 export const CACHE_DIR = ".cache.graphics"
+
+let atomicSeq = 0
+/**
+ * 原子写文件:先写同目录临时文件,再 renameSync 替换。并发写同一缓存文件时,
+ * rename 是原子的 → 不会出现「后写覆盖先写的一半」的撕裂内容。临时名带 pid+随机+序号,避免并发自冲突。
+ * Atomic file write: write a sibling temp file then renameSync over the target. rename is atomic,
+ * so concurrent writers can't tear each other's content. Temp name has pid+random+seq to avoid self-collision.
+ */
+function atomicWriteFileSync(file: string, content: string): void {
+  mkdirSync(dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.${atomicSeq++}.tmp`
+  try {
+    writeFileSync(tmp, content)
+    renameSync(tmp, file)
+  } catch (e) {
+    rmSync(tmp, { force: true }) // 失败清理临时文件 / clean up temp on failure
+    throw e
+  }
+}
 
 /**
  * 解析缓存文件绝对路径。
@@ -44,21 +63,45 @@ export function resolveCacheFile(defaultName: string, custom?: string): string {
 /** 键 → 字符串 的缓存存储。 / A "key → string" cache store. */
 export type CacheStore = Record<string, string>
 
-/** 读取缓存(损坏/缺失 → 空)。 / Load cache (corrupt/missing → empty). */
-export function loadCache(file: string): CacheStore {
+/** 是否为「文件不存在」错误(ENOENT)。 / Whether an error is "file not found" (ENOENT). */
+function isMissing(e: unknown): boolean {
+  return !!e && typeof e === "object" && (e as { code?: string }).code === "ENOENT"
+}
+
+/**
+ * 读 + 解析一个 JSON 缓存文件,区分两类失败:
+ *   · 文件不存在(ENOENT)→ 正常缺省,静默返回 null。
+ *   · 文件存在但解析失败(损坏)→ console.warn 一条(中英双语,提示将重建),返回 null。
+ * 绝不抛:缓存损坏必须可自愈,不能让构建失败。
+ * Read + parse a JSON cache file, distinguishing: missing (ENOENT) → silent null;
+ * present-but-corrupt → warn once and return null. Never throws — a corrupt cache must self-heal.
+ */
+function readJsonCache<T>(file: string): T | null {
+  let raw: string
   try {
-    return JSON.parse(readFileSync(file, "utf8")) as CacheStore
-  } catch {
-    return {}
+    raw = readFileSync(file, "utf8")
+  } catch (e) {
+    if (!isMissing(e)) console.warn(`缓存读取失败,将重建: ${file}\nCache read failed, will rebuild: ${file}\n${String(e)}`)
+    return null
   }
+  try {
+    return JSON.parse(raw) as T
+  } catch (e) {
+    console.warn(`缓存文件损坏(JSON 解析失败),将重建: ${file}\nCorrupt cache file (invalid JSON), will rebuild: ${file}\n${String(e)}`)
+    return null
+  }
+}
+
+/** 读取缓存(缺失 → 空;损坏 → 告警后空,见 readJsonCache)。 / Load cache (missing → empty; corrupt → warn + empty). */
+export function loadCache(file: string): CacheStore {
+  return readJsonCache<CacheStore>(file) ?? {}
 }
 
 /** 写回缓存(键排序 + 结尾换行 + 自动建目录)。 / Persist cache (sorted keys + trailing newline + mkdir). */
 export function saveCache(file: string, store: CacheStore): void {
-  mkdirSync(dirname(file), { recursive: true })
   const sorted: CacheStore = {}
   for (const k of Object.keys(store).sort()) sorted[k] = store[k]
-  writeFileSync(file, `${JSON.stringify(sorted, null, 2)}\n`)
+  atomicWriteFileSync(file, `${JSON.stringify(sorted, null, 2)}\n`)
 }
 
 /**
@@ -68,12 +111,10 @@ export function saveCache(file: string, store: CacheStore): void {
  * 返回被移除的条目数。 / Returns the number of removed entries.
  */
 export function pruneCache(file: string, validKeys: Iterable<string>, label?: string): number {
-  let cache: CacheStore
-  try {
-    cache = JSON.parse(readFileSync(file, "utf8")) as CacheStore
-  } catch {
-    return 0 // 无缓存文件 → 无需剪枝 / no cache file → nothing to prune
-  }
+  // 缺失 → 无需剪枝;损坏 → readJsonCache 已告警,同样跳过(下次构建重建)。
+  // Missing → nothing to prune; corrupt → already warned by readJsonCache, skip likewise.
+  const cache = readJsonCache<CacheStore>(file)
+  if (!cache) return 0
   const valid = new Set(validKeys)
   const stale = Object.keys(cache).filter((k) => !valid.has(k))
   if (stale.length === 0) return 0
@@ -110,12 +151,9 @@ const safeHashFile = (abs: string): string | null => {
   }
 }
 
+// 复用 readJsonCache:缺失→静默 null;损坏→告警后 null(见上)。 / Reuse readJsonCache: missing→silent, corrupt→warn.
 function readJson<T>(file: string): T | null {
-  try {
-    return JSON.parse(readFileSync(file, "utf8")) as T
-  } catch {
-    return null
-  }
+  return readJsonCache<T>(file)
 }
 
 function rmIfExists(abs: string): void {
@@ -253,9 +291,8 @@ export async function groupCache(args: GroupCacheArgs, regenerate: () => Promise
     for (const rel of prev.outputs) if (!now.has(rel)) { rmIfExists(fromRepoRel(rel)); removed.push(rel) }
   }
 
-  mkdirSync(dirname(cacheFile), { recursive: true })
   const data: GroupCacheFile = { configHash, files: sortRecord(files), outputs: [...outputs].sort(), hash: repHash }
-  writeFileSync(cacheFile, `${JSON.stringify(data, null, 2)}\n`)
+  atomicWriteFileSync(cacheFile, `${JSON.stringify(data, null, 2)}\n`)
   return { hit: false, written, removed }
 }
 
@@ -300,8 +337,7 @@ export function openPerFileCache(cacheFile: string, configHash: string): PerFile
       temp[relPath] = finalHash
     },
     save() {
-      mkdirSync(dirname(cacheFile), { recursive: true })
-      writeFileSync(cacheFile, `${JSON.stringify({ configHash, files: sortRecord(temp) }, null, 2)}\n`)
+      atomicWriteFileSync(cacheFile, `${JSON.stringify({ configHash, files: sortRecord(temp) }, null, 2)}\n`)
     },
   }
 }

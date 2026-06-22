@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-import { groupCache, openPerFileCache } from "./src/cache.ts"
+import { groupCache, loadCache, openPerFileCache, saveCache } from "./src/cache.ts"
 
 const root = resolve(process.cwd(), ".cache-test-tmp")
 rmSync(root, { recursive: true, force: true })
@@ -123,6 +123,56 @@ check(c.decide("img/y.png", "hX") === "skip", "perfile: moved key migrated → n
 
 c = openPerFileCache(pf, "icfg2")
 check(c.decide("img/x.png", "hX") === "process", "perfile: configHash change = process all")
+
+// ───────── loadCache / saveCache:原子写并发不撕裂 + 损坏 JSON 告警可恢复 ─────────
+const lc = resolve(root, ".cache/store.json")
+
+// 并发多次 saveCache 同一文件(temp+rename 原子写)→ 文件内容始终是合法 JSON,不出现撕裂半截。
+const stores = Array.from({ length: 40 }, (_, i) => {
+  const s: Record<string, string> = {}
+  for (let k = 0; k <= i; k++) s[`k${k}`] = `v${k}-${"x".repeat(i)}` // 每次大小不同 → 放大撕裂风险
+  return s
+})
+await Promise.all(stores.map((s) => Promise.resolve().then(() => saveCache(lc, s))))
+let parsedOk = false
+try {
+  JSON.parse(readFileSync(lc, "utf8"))
+  parsedOk = true
+} catch {
+  parsedOk = false
+}
+check(parsedOk, "atomicWrite: 并发 saveCache 后文件为合法 JSON(temp+rename 不撕裂)")
+// 末状态应等于某一次完整写入(本测全 await,最后一次胜出);至少应能 loadCache 回读为对象。
+check(typeof loadCache(lc) === "object" && loadCache(lc) !== null, "atomicWrite: loadCache 回读为对象")
+
+// 损坏 JSON → loadCache 返回 {} 且触发 warn(可恢复,不抛)。
+writeFileSync(lc, "{ this is not valid json", "utf8")
+const origWarn = console.warn
+const warnLogs: string[] = []
+console.warn = (...a: unknown[]) => {
+  warnLogs.push(a.join(" "))
+}
+let corruptResult: Record<string, string> = { sentinel: "1" }
+let corruptThrew = false
+try {
+  corruptResult = loadCache(lc)
+} catch {
+  corruptThrew = true
+} finally {
+  console.warn = origWarn
+}
+check(!corruptThrew && Object.keys(corruptResult).length === 0, "corrupt: loadCache 返回 {} 不抛")
+check(warnLogs.some((l) => l.includes("损坏") || l.toLowerCase().includes("corrupt")), "corrupt: 触发告警(中英双语)")
+
+// 缺失文件(ENOENT)→ 静默返回 {},不告警。
+const missing = resolve(root, ".cache/does-not-exist.json")
+const warn2: string[] = []
+console.warn = (...a: unknown[]) => {
+  warn2.push(a.join(" "))
+}
+const missingResult = loadCache(missing)
+console.warn = origWarn
+check(Object.keys(missingResult).length === 0 && warn2.length === 0, "missing: ENOENT 静默返回 {}(不告警)")
 
 process.chdir(resolve(root, ".."))
 rmSync(root, { recursive: true, force: true })

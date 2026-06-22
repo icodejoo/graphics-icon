@@ -49,7 +49,14 @@ export async function prepareIcons(
 
   // 各块并行;某 worker 失败时该块回退主线程同步处理,保证不丢图标
   const results = await Promise.all(
-    chunks.map((c) => runChunk(c, o).catch(() => Promise.all(c.map((r) => prepareOne(r, o))))),
+    chunks.map((c) =>
+      runChunk(c, o).catch((e) => {
+        // worker 失败 → 告警被吞的 error 后回退主线程同步处理该块(保证不丢图标,便于排查)。
+        // Worker failed → warn the swallowed error, then process this chunk synchronously on the main thread.
+        console.warn(`[colorfont] 预处理 worker 失败,已回退主线程同步处理(${c.length} 个图标):\n${String(e)}`)
+        return Promise.all(c.map((r) => prepareOne(r, o)))
+      }),
+    ),
   )
   return results.flat() // 连续切块 → flat 即原始顺序
 }

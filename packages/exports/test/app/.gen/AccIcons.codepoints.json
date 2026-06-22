@@ -4,27 +4,27 @@
   "glyphs": {
     "arrow-left": {
       "codepoint": 57344,
-      "since": "2026-06-21",
+      "since": "2026-06-22",
       "present": true
     },
     "badge-grad": {
       "codepoint": 57345,
-      "since": "2026-06-21",
+      "since": "2026-06-22",
       "present": true
     },
     "home": {
       "codepoint": 57346,
-      "since": "2026-06-21",
+      "since": "2026-06-22",
       "present": true
     },
     "logo-color": {
       "codepoint": 57347,
-      "since": "2026-06-21",
+      "since": "2026-06-22",
       "present": true
     },
     "star": {
       "codepoint": 57348,
-      "since": "2026-06-21",
+      "since": "2026-06-22",
       "present": true
     }
   }

@@ -4,7 +4,7 @@
  * svg-icons CLI — generate SVG sprite sheets outside Vite (for pre-commit / scripts).
  *
  * 用法 / Usage：
- *   <bin> --config ./svg.config.ts        # 配置文件需 default-export 一个 SvgIconsOptions（含 sprites[]）
+ *   <bin> --config ./svg.config.ts        # 配置文件需 default-export 一个 SvgIconsOptions（含 items[]）
  *
  * 只「按配置生成 + 维护缓存」，不碰 git。/ Only generate + maintain cache; never touches git.
  */
@@ -26,7 +26,7 @@ function getConfigArg(argv: string[]): string | undefined {
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const configPath = getConfigArg(argv)
   if (!configPath) {
-    console.error("[svg-icons] 需要 --config <配置文件>（default-export 一个含 sprites[] 的 SvgIconsOptions）")
+    console.error("[svg-icons] 需要 --config <配置文件>（default-export 一个含 items[] 的 SvgIconsOptions）")
     process.exitCode = 1
     return
   }

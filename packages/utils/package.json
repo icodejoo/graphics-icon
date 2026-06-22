@@ -42,9 +42,16 @@
     "./scale-svg": {
       "types": "./src/scale-svg.ts",
       "import": "./src/scale-svg.ts"
+    },
+    "./banner": {
+      "types": "./src/banner.ts",
+      "import": "./src/banner.ts"
     }
   },
   "files": ["src"],
+  "scripts": {
+    "test": "node --experimental-strip-types cache.test.ts"
+  },
   "dependencies": {
     "scale-that-svg": "catalog:",
     "svgo": "catalog:",

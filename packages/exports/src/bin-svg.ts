@@ -5,7 +5,7 @@
  *
  * 复用 svg-icons 的 runCli（已随本包打包）。用法：svg-icons --config ./svg.config.ts
  * Reuses svg-icons' runCli (bundled). Usage: svg-icons --config ./svg.config.ts
- * 编程调用见库导出 `gSvg(argv?)`。/ For programmatic use, import `gSvg(argv?)` from the package root.
+ * 编程调用见子路径 `graphics-icon/svg` 的 `runCli`。/ For programmatic use, import `runCli` from `graphics-icon/svg`.
  */
 import { runCli } from 'svg-icons'
 

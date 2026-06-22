@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "test": "pnpm -r test"
+  },
   "description": "High-performance, full-featured graphics build toolkit (pnpm monorepo): SVG icons -> color webfont (colorfont), bitmap sprite sheets, image compression (imagemin), and SVG symbol sprites - sharing one utils submodule, one cache folder, and on-demand modular loading.",
   "keywords": [
     "graphics",

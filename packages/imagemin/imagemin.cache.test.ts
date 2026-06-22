@@ -54,6 +54,30 @@ try {
 check(!threw2, "throwable:false: corrupt image does NOT throw")
 check(!!res2 && res2.results.some((x) => x.error), "throwable:false: error reported in results")
 
+// ───────── 压缩比:核心算法「重压更小 + 绝不放大」(此前只验 skipped 标志,未验真压缩) ─────────
+// 造一张 q100 渐变 JPEG(可压缩),用 q50 重压 → 必更小且写回;再用 q95 重压已是 q50 的图 → 更大则保留原图。
+const { default: sharp } = await import("sharp")
+const W = 96, H = 96
+const raw = Buffer.alloc(W * H * 3)
+for (let y = 0; y < H; y++) {
+  for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 3
+    raw[i] = Math.floor((x * 255) / W)
+    raw[i + 1] = Math.floor((y * 255) / H)
+    raw[i + 2] = Math.floor(((x + y) * 255) / (W + H))
+  }
+}
+const q100 = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).jpeg({ quality: 100 }).toBuffer()
+writeFileSync("photo.jpg", q100)
+
+const rc = await imagemin([resolve("photo.jpg")], { ...base, include: "**/*.{svg,png,jpg,jpeg}", jpeg: { quality: 50 } })
+check(rc.results[0]?.skipped === false && rc.results[0]?.changed === true, "compress: jpeg q50 重压发生改写")
+check(rc.results[0]?.after < rc.results[0]?.before, `compress: 重压后更小(${rc.results[0]?.before}→${rc.results[0]?.after})`)
+
+// photo.jpg 现已是 q50;用 q95 重压会更大 → 不写回(保留原图)→ after<=before,验「绝不放大」保证。
+const r3 = await imagemin([resolve("photo.jpg")], { ...base, include: "**/*.{svg,png,jpg,jpeg}", jpeg: { quality: 95 }, cacheFile: resolve(root, ".cache/imagemin3.json") })
+check(r3.results[0]?.after <= r3.results[0]?.before, "compress: 绝不放大(更大则保留原图,after<=before)")
+
 process.chdir(resolve(root, ".."))
 rmSync(root, { recursive: true, force: true })
 console.log(`\n${fail === 0 ? "✅" : "❌"} imagemin cache test: ${pass} passed, ${fail} failed`)

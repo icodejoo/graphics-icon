@@ -1,3 +1,5 @@
+import { autoGenBanner } from '@codejoo/utils/banner'
+
 import type { FontAsset, FontFlavor, FontFormat, FontMetadata, ResolvedOptions } from '../types.ts'
 
 const FORMAT_ORDER: FontFormat[] = ['woff2', 'woff', 'ttf']
@@ -68,7 +70,7 @@ export function emitCss(
   // 保底块按容器格式逐 url 注释(都是 mono,区别在格式支持度)
   const fallbackSrc = monoAssets.map((a) => entry(a, null, FORMAT_NOTE[a.format])).join(',\n       ')
 
-  let css = `@font-face {
+  let css = `${autoGenBanner('block')}@font-face {
   font-family: ${ff};
   font-display: block;
   src: ${fallbackSrc};

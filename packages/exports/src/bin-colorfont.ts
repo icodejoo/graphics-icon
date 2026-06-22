@@ -5,7 +5,7 @@
  *
  * 复用 color-fonts 的 runCli（已随本包打包）。用法见 colorfont CLI（build / watch / check 子命令）。
  * Reuses color-fonts's runCli (bundled). See the colorfont CLI (build / watch / check subcommands).
- * 编程调用见库导出 `gColorfont(argv?)`。/ For programmatic use, import `gColorfont(argv?)` from the package root.
+ * 编程调用见子路径 `graphics-icon/colorfont` 的 `runCli`。/ For programmatic use, import `runCli` from `graphics-icon/colorfont`.
  */
 import { runCli } from 'color-fonts'
 

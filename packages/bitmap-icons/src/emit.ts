@@ -14,6 +14,7 @@
  * (skip when unchanged) to avoid HMR loops in dev. Relative url()/import resolved by Vite.
  */
 
+import { autoGenBanner } from "@codejoo/utils/banner"
 import { writeTextIfChanged } from "@codejoo/utils/fs-write"
 import { relTo } from "@codejoo/utils/path-rel"
 
@@ -36,8 +37,7 @@ export function emitStyle(out: string, manifest: IconManifest, ctx: StyleCtx): v
   const url = relTo(out, ctx.imagePath)
   const lines: string[] = [
     // 用 /* */ 块注释:纯 CSS 不支持 // 行注释(PostCSS 会报 Unknown word)
-    "/* 本文件由 vite-plugin-bitmap-icons 自动生成,请勿手改。",
-    ` * 用法:<i class="${prefix} ${prefix}-foo"></i>`,
+    `/* 用法:<i class="${prefix} ${prefix}-foo"></i>`,
     " *   · 默认按 width(px,可经 pxtorem 等转 rem/vw)显示,高度按 aspect-ratio 自动;",
     " *   · 改元素 width(或同时设 width/height)即按容器自适应铺满 —— 背景按百分比缩放/定位,与 CSS 单位、像素密度无关。",
     " */",
@@ -63,7 +63,7 @@ export function emitStyle(out: string, manifest: IconManifest, ctx: StyleCtx): v
       "",
     )
   }
-  writeTextIfChanged(out, lines.join("\n"))
+  writeTextIfChanged(out, autoGenBanner("block") + lines.join("\n"))
 }
 
 interface ScriptCtx {
@@ -87,7 +87,7 @@ export function emitScript(out: string, manifest: IconManifest, ctx: ScriptCtx):
   const head = isTs ? '/// <reference types="vite/client" />\n' : ""
   const names = Object.keys(manifest)
   let content =
-    `${head}// 本文件由 vite-plugin-bitmap-icons 自动生成,请勿手改。\n` +
+    `${head}${autoGenBanner("line")}` +
     `import "${relStyle}" // 注入雪碧图样式(副作用)\n` +
     `import iconsImage from "${relImage}" // 图集 URL(Vite 解析/带 hash)\n\n` +
     "export { iconsImage }\n" +

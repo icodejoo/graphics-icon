@@ -1,5 +1,5 @@
 {
-  "configHash": "258df64516ec74c57c500804ddfd55040b29fb8da14475799b0dd01027fed9f2",
+  "configHash": "89c002c2dfc6ebfcb4b35876c5261ec953ce419942d9cdf181f3493f220b8367",
   "files": {
     "fixtures/arrow-left.svg": "368d8f11b8808cf53f144551bce9d5667221e224efb1cec78c977950250677b4",
     "fixtures/badge-grad.svg": "62299bc642267a4d82745a5cd650cb43540fe377b270bac15842ebd94607c7d4",
@@ -8,14 +8,14 @@
     "fixtures/star.svg": "8123ed91285d84cfdb52f3d595abac465f3362918fd0c1a53dd00b4e624675ce"
   },
   "outputs": [
-    ".test-out/CliIcons.colrv0.68f94a1e.woff",
-    ".test-out/CliIcons.colrv0.c19df425.woff2",
+    ".test-out/CliIcons.colrv0.woff",
+    ".test-out/CliIcons.colrv0.woff2",
     ".test-out/CliIcons.css",
-    ".test-out/CliIcons.mono.03a7bbbb.woff2",
-    ".test-out/CliIcons.mono.57576a9d.woff",
-    ".test-out/CliIcons.otsvg.b67ac777.woff",
-    ".test-out/CliIcons.otsvg.c30bd54b.woff2",
+    ".test-out/CliIcons.mono.woff",
+    ".test-out/CliIcons.mono.woff2",
+    ".test-out/CliIcons.otsvg.woff",
+    ".test-out/CliIcons.otsvg.woff2",
     ".test-out/CliIcons.ts"
   ],
-  "hash": "168171e7f8b33d3090e07c88617da69fab3cb0fa878449701bf41477d22c1e4b"
+  "hash": "1793a6b476e6f08093458a35a17f7cef230e831cc083d53a1bd08d5f25ac63bd"
 }

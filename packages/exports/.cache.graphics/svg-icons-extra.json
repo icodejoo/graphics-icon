@@ -1,5 +1,5 @@
 {
-  "configHash": "e2dc73bce146462635de1e2b28eaf0a334e5d647ab435c551591e885e577a471",
+  "configHash": "7f8ab4290f6c74cd1295150721a795cb2b2e8a0b9d71c894d014094355780457",
   "files": {
     "test/.acc-unused/icons/a.svg": "5244ce0f922fa1bd5bcb0decf0f72765bc355dd07bd1ee8d889b978dfde87f62"
   },
@@ -7,5 +7,5 @@
     "test/.acc-svg/extra.svg",
     "test/.acc-svg/extra.ts"
   ],
-  "hash": "5bdf3a00fb6faaf4e50a06fda02bdef72ab812a9dd0eb6ff1d40f51c6a85fc78"
+  "hash": "12737556fc7dcbbd5551ea7f248d9eba1a5078c165f086ad33a361830e81e5d5"
 }

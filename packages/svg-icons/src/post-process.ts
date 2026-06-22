@@ -21,6 +21,7 @@
 
 import { readFile, writeFile } from "node:fs/promises"
 
+import { autoGenBanner } from "@codejoo/utils/banner"
 import { relTo } from "@codejoo/utils/path-rel"
 import { writeTextIfChanged } from "@codejoo/utils/fs-write"
 import { normalizeSvg } from "@codejoo/utils/scale-svg"
@@ -85,42 +86,69 @@ function resolveNormalizeWidth(opt: NormalizeOption): number {
  * downstream steps still apply.
  */
 async function normalizeSymbols(sprite: string, width: number): Promise<string> {
-  // 收集每个 symbol，逐个异步归一化后再拼回（regex replace 不支持 async，故手动遍历）。
+  // 各 symbol 的归一化互相独立 → 先收集所有 symbol(及其前置文本片段),并行归一化,再按原顺序拼回。
+  // 顺序与逐 symbol 回退逻辑保持不变(失败 → 保留原片段)。
+  // Symbols normalize independently → collect, normalize in parallel, then reassemble in order.
+  // Order and per-symbol fallback (failure → keep original) are unchanged.
   const re = /<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/g
-  let out = ""
+  interface Seg {
+    /** 此 symbol 之前的原文片段(包含 symbol 之间/之前的内容)。 / Source text before this symbol. */
+    before: string
+    /** 该 symbol 归一化后(或回退原样)的替换内容。 / Normalized (or fallback) replacement. */
+    replace: Promise<string>
+  }
+  const segs: Seg[] = []
   let last = 0
   let m: RegExpExecArray | null
   while ((m = re.exec(sprite)) !== null) {
     const [full, attrs, inner] = m
-    out += sprite.slice(last, m.index)
+    const before = sprite.slice(last, m.index)
     last = m.index + full.length
 
     const vbMatch = /\bviewBox="([^"]+)"/.exec(attrs)
     if (!vbMatch) {
-      out += full // 无 viewBox → 跳过（保持原样）
+      segs.push({ before, replace: Promise.resolve(full) }) // 无 viewBox → 跳过(保持原样)
       continue
     }
     const viewBox = vbMatch[1]
-    // 用 symbol 的 viewBox + inner 重建独立 svg → 归一化
+    // 用 symbol 的 viewBox + inner 重建独立 svg → 归一化(并行)
     const standalone = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">${inner}</svg>`
-    let normalized: string
-    try {
-      normalized = await normalizeSvg(standalone, { scaleTo: width })
-    } catch {
-      out += full // 归一化失败 → 保留原样，确保产物有效
-      continue
-    }
-    // 从归一化结果里取回新的 viewBox 与新的 inner
-    const newVbMatch = /\bviewBox="([^"]+)"/.exec(normalized)
-    const newViewBox = newVbMatch ? newVbMatch[1] : viewBox
-    const innerMatch = /<svg\b[^>]*>([\s\S]*)<\/svg>/.exec(normalized)
-    const newInner = innerMatch ? innerMatch[1] : inner
-    // 把原 attrs 里的 viewBox 替换为新值（保留 id 及其它属性）
-    const newAttrs = attrs.replace(/\bviewBox="[^"]+"/, `viewBox="${newViewBox}"`)
-    out += `<symbol${newAttrs}>${newInner}</symbol>`
+    const replace = normalizeSvg(standalone, { scaleTo: width }).then(
+      (normalized) => {
+        // 从归一化结果里取回新的 viewBox 与新的 inner
+        const newVbMatch = /\bviewBox="([^"]+)"/.exec(normalized)
+        const newViewBox = newVbMatch ? newVbMatch[1] : viewBox
+        const innerMatch = /<svg\b[^>]*>([\s\S]*)<\/svg>/.exec(normalized)
+        const newInner = innerMatch ? innerMatch[1] : inner
+        // 把原 attrs 里的 viewBox 替换为新值(保留 id 及其它属性)
+        const newAttrs = attrs.replace(/\bviewBox="[^"]+"/, `viewBox="${newViewBox}"`)
+        return `<symbol${newAttrs}>${newInner}</symbol>`
+      },
+      () => full, // 归一化失败 → 保留原样,确保产物有效
+    )
+    segs.push({ before, replace })
   }
-  out += sprite.slice(last)
+  const tail = sprite.slice(last)
+
+  const replaced = await Promise.all(segs.map((s) => s.replace))
+  let out = ""
+  for (let i = 0; i < segs.length; i++) out += segs[i].before + replaced[i]
+  out += tail
   return out
+}
+
+/**
+ * 在 sprite svg 头部插入「自动生成」XML 注释（中英双语）。
+ * 若有 <?xml?> 序言则插在其后，否则插在最前；已存在则不重复添加（幂等）。
+ * Insert the bilingual auto-generated XML banner at the head of the sprite svg
+ * (after an <?xml?> prolog if present). Idempotent: skips if already present.
+ */
+function prependSvgBanner(svg: string): string {
+  const banner = autoGenBanner("xml")
+  if (svg.includes(banner.trim())) return svg
+  const m = /^\s*<\?xml[^>]*\?>\s*/.exec(svg)
+  if (m) return svg.slice(0, m[0].length) + banner + svg.slice(m[0].length)
+  return banner + svg
 }
 
 /** 从 sprite 提取所有 <symbol id="..."> 的 id（= 图标名），去重排序。 */
@@ -143,7 +171,7 @@ export function buildScriptFile(scriptFile: string, spriteFile: string, names: s
   const rel = relTo(scriptFile, spriteFile)
   const isTs = /\.ts$/i.test(scriptFile)
   const obj = names.map((n) => `"${n}": "${n}"`).join(", ")
-  let content = `import iconsHref from "${rel}?url"\n\nexport { iconsHref }\nexport const iconsName = { ${obj} }\n`
+  let content = `${autoGenBanner("line")}import iconsHref from "${rel}?url"\n\nexport { iconsHref }\nexport const iconsName = { ${obj} }\n`
   if (isTs) {
     content += `export type IconName = ${names.length > 0 ? names.map((n) => `"${n}"`).join(" | ") : "never"}\n`
   }
@@ -175,6 +203,7 @@ export async function runPostProcess(t: PostTarget): Promise<void> {
   if (width > 0) next = await normalizeSymbols(next, width)
   next = scopeIconIds(next)
   next = applyColor(next, t.color)
+  next = prependSvgBanner(next)
   if (next !== sprite) {
     await writeFile(t.sprite, next, "utf8")
     sprite = next

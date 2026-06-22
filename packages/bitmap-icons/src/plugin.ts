@@ -36,16 +36,41 @@ export function bitmapIconsVite(options: BitmapIconsOptions): Plugin {
     })
   }
 
+  // in-flight 合并:watchChange 与 handleHotUpdate 可能为同一次保存并发触发 →
+  // 同一时刻只跑一次,进行中再来的触发尾随一次,避免并发写同一产物 + 缓存。
+  // In-flight coalescing: dedupe concurrent watchChange/handleHotUpdate; run once, tail one rerun.
+  let running: Promise<void> | null = null
+  let pending = false
+  const regenerate = (): Promise<void> => {
+    if (running) {
+      pending = true
+      return running
+    }
+    running = (async () => {
+      try {
+        await bitmapIcons(options)
+        while (pending) {
+          pending = false
+          await bitmapIcons(options)
+        }
+      } finally {
+        running = null
+        pending = false
+      }
+    })()
+    return running
+  }
+
   return {
     name: "vite-plugin-bitmap-icons",
     async buildStart() {
       await bitmapIcons(options)
     },
     async watchChange(id) {
-      if (affects(id)) await bitmapIcons(options)
+      if (affects(id)) await regenerate()
     },
     async handleHotUpdate({ file }) {
-      if (affects(file)) await bitmapIcons(options)
+      if (affects(file)) await regenerate()
     },
   }
 }

@@ -5,7 +5,7 @@
  *
  * 复用 bitmap-icons 的 runCli（已随本包打包）。用法：bitmap-icons --config ./bitmap.config.ts
  * Reuses bitmap-icons' runCli (bundled). Usage: bitmap-icons --config ./bitmap.config.ts
- * 编程调用见库导出 `gBitmap(argv?)`。/ For programmatic use, import `gBitmap(argv?)` from the package root.
+ * 编程调用见子路径 `graphics-icon/bitmap` 的 `runCli`。/ For programmatic use, import `runCli` from `graphics-icon/bitmap`.
  */
 import { runCli } from 'bitmap-icons'
 

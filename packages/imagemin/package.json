@@ -49,6 +49,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup"
+    "build": "tsup",
+    "test": "node --experimental-strip-types imagemin.cache.test.ts"
   }
 }

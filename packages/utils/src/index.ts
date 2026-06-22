@@ -18,3 +18,5 @@ export { CACHE_DIR, resolveCacheFile, loadCache, saveCache, pruneCache, groupCac
 export type { CacheStore, GroupInput, GroupProduct, GroupCacheFile, GroupCacheArgs, GroupCacheResult, PerFileCache, PerFileAction } from "./cache.ts"
 export { scaleSvgToWidth, normalizeSvg } from "./scale-svg.ts"
 export type { NormalizeOptions } from "./scale-svg.ts"
+export { autoGenBanner } from "./banner.ts"
+export type { CommentStyle } from "./banner.ts"
