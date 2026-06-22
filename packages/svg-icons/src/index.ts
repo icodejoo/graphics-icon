@@ -19,11 +19,8 @@
  *         items: [
  *           {
  *             sources: "src/assets/icons",   // 单目录;多目录用数组 ["a", "b"]
- *             output: {
- *               svg: "src/sprites/common.sprites.svg",
- *               script: "src/sprites/index.ts",
- *             },
- *             color: true,            // fill/stroke → currentColor（主题化）
+ *             output: { dir: "src/sprites", name: "common" }, // 三产物恒产:common.{svg,ts,json}（ts 默认 true,可加 ts:false 产 .js）
+ *             color: "mono",          // 'keep'(默认)|'mono'(单色 → currentColor 主题化)|函数(逐色重映射);省略 = 'keep'
  *             normalize: false,       // 可选：true 或 { width: 1024 } 开启 colorfont 风格归一化
  *           },
  *         ],

@@ -39,17 +39,17 @@ export default defineConfig({
     graphicsIcon({
       colorfonts: {
         colorFormat: 'auto',                  // common (merged into each item)
-        items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }],
+        items: [{ sources: 'src/icons/color', output: { dir: 'src/fonts', fontName: 'AppIcons', name: 'AppIcons' } }],
       },
-      svgIcons:   { items: [{ input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' }, color: true }] },
-      bitmapIcons:{ items: [{ inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css' } }] },
+      svgIcons:   { items: [{ sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' }, color: 'mono' }] },
+      bitmapIcons:{ items: [{ sources: 'src/icons/png', output: { dir: 'src/sprites', name: 'sheet' } }] },
       imagemin:   { enabled: true },
     }),
   ],
 })
 ```
 
-**colorfont is real-disk**: it writes real `<fontName>.css`, `<fontName>.ts`, the font files, and `<fontName>.codepoints.json` into `outDir` (commit them, like the sprites). Consume them with normal imports — there are **no `virtual:colorfont*` modules**:
+**colorfont is real-disk**: it writes the fonts plus `<name>.css`, `<name>.ts`, and `<name>.codepoints.json` into `output.dir` (commit them, like the sprites). Consume them with normal imports — there are **no `virtual:colorfont*` modules**:
 
 ```ts
 import './fonts/AppIcons.css'                       // @font-face + .icon classes
@@ -63,7 +63,7 @@ The generated `<fontName>.ts` exports a typed API (all keyed by `IconName`):
 | Export | Type | Use |
 | --- | --- | --- |
 | `icons` | `Record<IconName, string>` | **icon name → CSS class name** (the per-icon class, e.g. `'home' → 'icon-home'`). Put it on an element together with `baseName`. |
-| `baseName` | `string` | The base class **without the dot** (default `'icon'`). Mounts the font; pair it with one `icons[name]`. |
+| `baseName` | `string` | The base class name = `classPrefix` (default `'icon'`). Mounts the font; pair it with one `icons[name]`. |
 | `codepoints` | `Record<IconName, number>` | icon name → assigned PUA codepoint (stable, locked in `codepoints.json`). |
 | `colorIcons` | `Partial<Record<IconName, true>>` | the **colored** icons only — `colorIcons[name]` is an O(1) "is this icon multi-color?" check. |
 | `iconContent(name)` | `(name: IconName) => string` | the glyph character (`String.fromCodePoint(codepoint)`) — for `::before { content }` in your own CSS, or canvas/`<text>`. |
@@ -106,11 +106,11 @@ If you would rather not commit the build caches but still need the **locks** tha
 # Option B — ignore the rebuildable caches, but keep the must-commit locks:
 .cache.graphics/*
 !.cache.graphics/imagemin.json        # content-hash + rename cache — commit it
-# colorfont codepoint locks live next to the fonts as <fontName>.codepoints.json
-# (in outDir, not in .cache.graphics/) — always committed regardless.
+# colorfont codepoint locks live next to the fonts as <name>.codepoints.json
+# (in output.dir, not in .cache.graphics/) — always committed regardless.
 ```
 
-> Note: the colorfont **codepoint lock** (`<fontName>.codepoints.json`) is written into `outDir` beside the fonts, **not** into `.cache.graphics/`, and must always be committed (it keeps PUA codepoints stable). It is not a cache product.
+> Note: the colorfont **codepoint lock** (`<name>.codepoints.json`) is written into `output.dir` beside the fonts, **not** into `.cache.graphics/`, and must always be committed (it keeps PUA codepoints stable). It is not a cache product.
 
 ---
 
@@ -137,15 +137,14 @@ Rule of thumb: in **`vite.config.ts`** use the `*PluginOptions` names from `grap
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `fontFamily` | `string` | = `fontName` | CSS `font-family`. |
 | `colorFormat` | `'mono'\|'colrv0'\|'otsvg'\|'colrv1'\|'auto'` | `'auto'` | Which flavors to emit. `auto`: mono+COLRv0+OT-SVG if any colored icon. |
 | `formats` | `('woff2'\|'woff'\|'ttf')[]` | `['woff2']` | Container formats. |
 | `woff2Quality` | `number` | `11` | WOFF2 quality 0–11 (dev auto-uses 9 with `devFast`). |
 | `colrv0` | `boolean` | `true` | Also emit a COLRv0 flat-color flavor. |
 | `unitsPerEm` | `number` | `1000` | Em units. |
 | `ascender` / `descender` | `number` | `round(em*0.8)` / `asc-em` | Vertical metrics. |
-| `baseSelector` | `string` | `'.icon'` | Base-class selector. |
-| `classPrefix` | `string` | `'icon-'` | Per-icon class prefix. |
+| `classPrefix` | `string` | `'icon'` | Bare class word (no dot, no trailing hyphen). Base selector = `.${classPrefix}` (`.icon`); HTML base class name = `classPrefix` (`icon`). |
+| `classSeparator` | `string` | `'-'` | Joins prefix and icon name. Per-icon selector = `.${classPrefix}${classSeparator}${name}` (`.icon-home`); per-icon HTML class = `classPrefix+classSeparator+name` (`icon-home`). e.g. `classSeparator: '__'` → `.icon__home`. |
 | `threads` | `boolean\|'auto'` | `'auto'` | Multi-threaded preprocessing (`auto`: icons ≥ 200). |
 | `paStart` | `number` | `0xE000` | PUA codepoint start. |
 | `cache` | `boolean` | `true` | Enable cache. |
@@ -155,11 +154,12 @@ Rule of thumb: in **`vite.config.ts`** use the `*PluginOptions` names from `grap
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `input` | `string \| string[]` | — **required** | SVG icon source dir(s). |
-| `outDir` | `string` | — **required** | Output dir (real fonts + `.css` + `.ts` + codepoints lock land here). |
-| `fontName` | `string` | — **required** | Font name (filename + `font-family`). |
-| `codepointsFile` | `string` | `<outDir>/<fontName>.codepoints.json` | Codepoint lock (commit it; stable PUA). Not a cache product. |
-| `cacheName` (vite) / `cacheFilename` (standalone) | `string` | derived from `fontName` | Per-instance cache file. |
+| `sources` | `string \| string[]` | — **required** | SVG icon source dir(s). |
+| `output.dir` | `string` | — **required** | Output dir (fonts + `.css` + `.ts` + codepoints lock all land here). |
+| `output.fontName` | `string` | — **required** | Font name (`@font-face` font-family + OpenType name table). |
+| `output.name` | `string` | — **required** | Product base name. Drives `{dir}/{name}.{flavor}.{format}`, `{dir}/{name}.css`, `{dir}/{name}.ts`, `{dir}/{name}.codepoints.json`. |
+| `output.ts` | `boolean` | `true` | Emit a `.ts` entry; `false` → an equivalent `.js` (same runtime exports, no types). |
+| `cacheName` (vite) / `cacheFilename` (standalone) | `string` | derived from `output.name` | Per-instance cache file. |
 
 **Vite plugin extras** (on the `colorfont` key): `watch?: boolean` (default true, regenerate on `.svg` change), `devFast?: boolean` (default true, WOFF2 q9 in dev).
 
@@ -205,20 +205,23 @@ A folder of SVGs → one sprite (`<symbol>` + `<use href>`), with id scoping, op
 
 **Common**: `color`, `normalize`, `iconNameTransformer`, `formatter`, `cache`, `throwable`.
 
+**All three products are always emitted**, paths derived from `dir`+`name`: sprite `{dir}/{name}.svg`, script `{dir}/{name}.{ts?ts:js}`, manifest `{dir}/{name}.json`.
+
 | Item option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `input` | `string` | — **required** | SVG source dir. |
-| `output.svg` | `string` | — **required** | Emitted sprite `.svg`. |
-| `output.script` | `string` | `undefined` | Typed entry (`iconsHref` + `iconsName` + `IconName`). |
-| `color` | `boolean\|string\|fn\|null` | `undefined` | `true` → `currentColor`; string → that color; fn → custom. |
+| `sources` | `string \| string[]` | — **required** | SVG source dir(s) (all merged into one sprite). |
+| `output.dir` | `string` | — **required** | Output dir (sprite + script + manifest all land here). |
+| `output.name` | `string` | — **required** | Product base name (shared by sprite/script/manifest). |
+| `output.ts` | `boolean` | `true` | Emit a `.ts` script with the `IconName` union; `false` → `.js` (runtime objects only). |
+| `color` | `'keep'\|'mono'\|ColorFn` | `'keep'` | svg-only. `'keep'` (default) keeps the source's multi-color; `'mono'` makes a robust single-color sprite (root `currentColor`, driven by CSS `color`); a function remaps each color individually. (Not to be confused with color-fonts' `colorFormat`.) |
 | `normalize` | `boolean\|{width?}` | `undefined` | colorfont-style normalize (default width 1024). |
 | `iconNameTransformer` | `(name)=>string` | identity | `<symbol>` id from filename. |
 | `formatter` | `'svgo'\|'prettier'\|'oxfmt'` | `'oxfmt'` | Output formatter (graceful fallback). |
-| `cacheName`/`cacheFilename` | `string` | derived from output | Per-instance cache file. |
+| `cacheName`/`cacheFilename` | `string` | derived from `output.name` | Per-instance cache file. |
 
 ### Consuming svg products
 
-The `output.script` entry default-imports the sprite as a URL and exports `iconsHref` (the sprite URL), `iconsName` (name → id object) and the `IconName` type. Reference a symbol with `<use href="<sprite-url>#<id>">`:
+The generated `{name}` script default-imports the sprite as a URL and exports `iconsHref` (the sprite URL), `iconsName` (name → id object) and the `IconName` type. Reference a symbol with `<use href="<sprite-url>#<id>">`:
 
 ```tsx
 // React / JSX
@@ -239,39 +242,41 @@ const SvgIcon = ({ name }: { name: IconName }) =>
 
 A folder of bitmaps → one sprite-sheet atlas (sharp + maxrects-packer) + stylesheet + entry script + optional coords JSON.
 
-**Common**: `padding`(2), `maxWidth`/`maxHeight`(4096), `pot`(false), `square`(false), `pixelRatio`(1), `png`, `webp`, `prefix`('sprite'), `nameTransformer`, `include`, `exclude`, `cache`, `throwable`.
+**Common**: `padding`(2), `maxWidth`/`maxHeight`(4096), `pot`(false), `square`(false), `pixelRatio`(1), `png`, `webp`, `classPrefix`('icon'), `classSeparator`('-'), `nameTransformer`, `include`, `exclude`, `cache`, `throwable`.
+
+**All four products are always emitted**, paths derived from `dir`+`name`: atlas `{dir}/{name}.{format}` (format default `webp`), stylesheet `{dir}/{name}.css`, script `{dir}/{name}.{ts?ts:js}`, coords `{dir}/{name}.json`.
 
 | Item option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `inputDir` | `string` | — **required** | Source image dir (`*.sprite.{webp,png}` auto-excluded). |
-| `output.image` | `string` | — **required** | Atlas (`.webp`/`.png`). |
-| `output.style` | `string` | — **required** | Stylesheet (`.css`/`.scss`). |
-| `output.script` | `string` | `undefined` | Entry script (`iconsImage` + `IconName`). |
-| `output.json` | `string` | `undefined` | Coords JSON. |
-| `cacheName`/`cacheFilename` | `string` | derived from image | Per-instance cache file. |
+| `sources` | `string \| string[]` | — **required** | Source image dir(s) (`*.sprite.{webp,png}` auto-excluded; all merged into one sheet). |
+| `output.dir` | `string` | — **required** | Output dir (atlas + `.css` + script + coords JSON all land here). |
+| `output.name` | `string` | — **required** | Product base name (shared by atlas/style/script/JSON). |
+| `output.ts` | `boolean` | `true` | Emit a `.ts` entry; `false` → `.js`. |
+| `output.format` | `'webp'\|'png'` | `'webp'` | Atlas image format. |
+| `cacheName`/`cacheFilename` | `string` | derived from `output.name` | Per-instance cache file. |
 
 ### Consuming bitmap products
 
-The stylesheet emits one base class `.<prefix>` (default `.sprite`) plus a per-icon class `.<prefix>-<name>` — so `<i class="sprite sprite-home">`. **Just import the `output.script` entry**: it side-effect-imports the stylesheet (injects the CSS) and the atlas image (resolved/hashed by Vite), then exports `iconsImage` (atlas URL), `iconsName` and the `IconName` type. You do not import the `.css`/image yourself.
+The stylesheet emits one base class `.icon` (the base selector `.${classPrefix}`) plus a per-icon class `.icon-<name>` (`.${classPrefix}${classSeparator}${name}`) — so `<i class="icon icon-home">`. **Just import the generated script**: it side-effect-imports the stylesheet (injects the CSS) and the atlas image (resolved/hashed by Vite), then exports `iconsImage` (atlas URL), `iconsName` and the `IconName` type. You do not import the `.css`/image yourself.
 
 ```ts
-import './sprites/sheet'   // output.script — injects the CSS + resolves the atlas image
+import './sprites/sheet'   // the {name} script — injects the CSS + resolves the atlas image
 ```
 
 ```html
 <!-- base class + per-icon class; each class carries default px size + aspect-ratio,
      change the element's width to scale to any container -->
-<i class="sprite sprite-home"></i>
+<i class="icon icon-home"></i>
 ```
 
-If you don't emit `output.script`, import the generated stylesheet directly instead (`import './sprites/sheet.css'`) — but then the atlas image URL is resolved relative to the CSS by Vite, which is what the script entry handles for you.
+If you don't want the script, import the generated stylesheet directly instead (`import './sprites/sheet.css'`) — but then the atlas image URL is resolved relative to the CSS by Vite, which is what the script entry handles for you.
 
 ```tsx
 // React — same classes, typed by IconName
 import './sprites/sheet'
 import { type IconName } from './sprites/sheet'
 
-const Sprite = ({ name }: { name: IconName }) => <i className={`sprite sprite-${name}`} />
+const Sprite = ({ name }: { name: IconName }) => <i className={`icon icon-${name}`} />
 ```
 
 ---
@@ -300,7 +305,7 @@ Build-time image optimization (sharp + svgo, hash cache + rename detection). `Im
 
 Finds **files nothing references** and writes a manifest table; deletion is a **separate** step (`removeUnused` / `remove-unused`) so a stray detection never deletes by surprise. **Not asset-only** — `ext`/`include` accept any extension/glob (`.js`/`.ts`/`.json`/…); the image/font list is just the default. Two detection backends, same table:
 
-- **Module-graph** (precise): the umbrella option key `unused?: UnusedDetectOptions | false` (build-only plugin, `apply:'build'`, never deletes). Best for code, since reachability = the Rollup graph. Used through the umbrella, the four engines' inputs and outputs (colorfonts/svgIcons/bitmapIcons items' `input`/`inputDir`/`output`/`outDir`) are **auto-excluded** so icon sources are never flagged or deleted.
+- **Module-graph** (precise): the umbrella option key `unused?: UnusedDetectOptions | false` (build-only plugin, `apply:'build'`, never deletes). Best for code, since reachability = the Rollup graph. Used through the umbrella, the three engines' sources and output dirs (colorfonts/svgIcons/bitmapIcons items' `sources` + `output.dir`) are **auto-excluded** so icon sources and products are never flagged or deleted.
 - **Static scan** (no Vite): `findUnused()` / `remove-unused --scan` — greps source files for references; for CLI/non-bundler flows. Conservative (over-keeps); entry code files (`main.ts`, HTML/config-referenced) may be false-flagged, so prefer the module-graph backend for code or `exclude` the entries.
 
 `UnusedDetectOptions` (module-graph) / `FindUnusedOptions` (static, adds `sources`/`sourceRoot`):
@@ -328,13 +333,13 @@ import { svgIcons } from 'graphics-icon/svg'
 import { bitmapIcons } from 'graphics-icon/bitmap'
 import { imagemin, defaultOptions } from 'graphics-icon/imagemin'
 
-await colorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons', cacheFilename: 'cf.json' }] })
-await svgIcons({ items: [{ input: 'svg', output: { svg: 'out/icons.svg' } }] })
-await bitmapIcons({ items: [{ inputDir: 'png', output: { image: 'out/sheet.webp', style: 'out/sheet.css' } }] })
+await colorfonts({ colorFormat: 'auto', items: [{ sources: 'icons', output: { dir: 'fonts', fontName: 'AppIcons', name: 'AppIcons' }, cacheFilename: 'cf.json' }] })
+await svgIcons({ items: [{ sources: 'svg', output: { dir: 'out', name: 'icons' } }] })
+await bitmapIcons({ items: [{ sources: 'png', output: { dir: 'out', name: 'sheet' } }] })
 await imagemin(files, { ...defaultOptions })
 ```
 
-- colorfont: `build(item)` → `BuildResult` (pure, no disk); `buildAndWrite(item)` → writes to `outDir`, returns `BuildResult | null` (`null` = cache hit); `colorfonts({items})` → batch.
+- colorfont: `build(item)` → `BuildResult` (pure, no disk); `buildAndWrite(item)` → writes to `output.dir`, returns `BuildResult | null` (`null` = cache hit); `colorfonts({items})` → batch.
 - svg/bitmap: `svgIcons`/`bitmapIcons({items})`.
 - imagemin: `imagemin(files, opts)` + `defaultOptions`.
 - unused: `findUnused({ root, include?, ext?, exclude?, sources? })` → static detect (no Vite), writes the table; `removeUnused({ include?, exclude?, dryRun? })` → delete from the table.
@@ -342,7 +347,7 @@ await imagemin(files, { ...defaultOptions })
 ## CLI
 
 ```bash
-color-fonts build --input icons --out fonts --name AppIcons   # also: watch / check
+color-fonts build --sources icons --dir fonts --font-name AppIcons --name AppIcons   # also: watch / check
 svg-icons    --config ./svg.config.ts      # default-exports { items: [...] }
 bitmap-icons --config ./bitmap.config.ts   # default-exports { items: [...] }
 image-min    --all --config ./imagemin.config.ts   # or pass a file list (pre-commit)
@@ -359,9 +364,9 @@ remove-unused --exclude "src/keep/**"              # delete, honoring the includ
 // svg.config.ts
 import type { SvgIconsOptions } from 'graphics-icon/svg'
 export default {
-  color: true,                                  // common — merged into each item
+  color: 'mono',                                // common — merged into each item
   items: [
-    { input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' } },
+    { sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' } },
   ],
 } satisfies SvgIconsOptions
 ```
@@ -370,9 +375,9 @@ export default {
 // bitmap.config.ts
 import type { BitmapIconsOptions } from 'graphics-icon/bitmap'
 export default {
-  prefix: 'sprite',                             // common
+  classPrefix: 'icon',                          // common (classSeparator defaults to '-')
   items: [
-    { inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css', script: 'src/sprites/sheet.ts' } },
+    { sources: 'src/icons/png', output: { dir: 'src/sprites', name: 'sheet' } },
   ],
 } satisfies BitmapIconsOptions
 ```
@@ -432,17 +437,17 @@ export default defineConfig({
     graphicsIcon({
       colorfonts: {
         colorFormat: 'auto',                  // 公共参数（合并进每个 item）
-        items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }],
+        items: [{ sources: 'src/icons/color', output: { dir: 'src/fonts', fontName: 'AppIcons', name: 'AppIcons' } }],
       },
-      svgIcons:   { items: [{ input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' }, color: true }] },
-      bitmapIcons:{ items: [{ inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css' } }] },
+      svgIcons:   { items: [{ sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' }, color: 'mono' }] },
+      bitmapIcons:{ items: [{ sources: 'src/icons/png', output: { dir: 'src/sprites', name: 'sheet' } }] },
       imagemin:   { enabled: true },
     }),
   ],
 })
 ```
 
-**colorfont 实物落盘**：把真实的 `<fontName>.css`、`<fontName>.ts`、字体文件、`<fontName>.codepoints.json` 写进 `outDir`（随仓库提交，和雪碧图一样）。用普通 import 消费，**没有 `virtual:colorfont*` 虚拟模块**：
+**colorfont 实物落盘**：把字体以及 `<name>.css`、`<name>.ts`、`<name>.codepoints.json` 写进 `output.dir`（随仓库提交，和雪碧图一样）。用普通 import 消费，**没有 `virtual:colorfont*` 虚拟模块**：
 
 ```ts
 import './fonts/AppIcons.css'                       // @font-face + .icon 类
@@ -456,7 +461,7 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 | 导出 | 类型 | 用途 |
 | --- | --- | --- |
 | `icons` | `Record<IconName, string>` | **图标名 → CSS 类名**（每图标类，如 `'home' → 'icon-home'`）；与 `baseName` 一起挂到元素上。 |
-| `baseName` | `string` | 基础类名（**不含点**，默认 `'icon'`）；挂载字体，与某个 `icons[name]` 配对使用。 |
+| `baseName` | `string` | 基础类名 = `classPrefix`（默认 `'icon'`）；挂载字体，与某个 `icons[name]` 配对使用。 |
 | `codepoints` | `Record<IconName, number>` | 图标名 → 分配的 PUA 码位（稳定，锁在 `codepoints.json`）。 |
 | `colorIcons` | `Partial<Record<IconName, true>>` | 仅**彩色**图标 —— `colorIcons[name]` 是 O(1) 的「是否多色」判定。 |
 | `iconContent(name)` | `(name: IconName) => string` | 字形字符（`String.fromCodePoint(码位)`）—— 用于自写 CSS 的 `::before { content }`，或 canvas/`<text>`。 |
@@ -499,11 +504,11 @@ const Icon = ({ name }: { name: IconName }) =>
 # 方案 B —— 忽略可重建缓存，但保留必须提交的锁：
 .cache.graphics/*
 !.cache.graphics/imagemin.json        # 内容哈希 + 改名缓存 —— 要提交
-# colorfont 码位锁是 <fontName>.codepoints.json，落在 outDir 字体旁
+# colorfont 码位锁是 <name>.codepoints.json，落在 output.dir 字体旁
 #（不在 .cache.graphics/ 里）—— 无论如何都要提交。
 ```
 
-> 注：colorfont 的**码位锁** `<fontName>.codepoints.json` 写在 `outDir` 字体旁，**不在** `.cache.graphics/` 里，必须始终提交（保持 PUA 码位稳定），它不是缓存产物。
+> 注：colorfont 的**码位锁** `<name>.codepoints.json` 写在 `output.dir` 字体旁，**不在** `.cache.graphics/` 里，必须始终提交（保持 PUA 码位稳定），它不是缓存产物。
 
 ### 选项类型命名：`*PluginOptions`（vite） vs `*Options`/`*Item`（引擎）
 
@@ -521,12 +526,12 @@ const Icon = ({ name }: { name: IconName }) =>
 ## 选项参考
 
 各能力的 `common` / `item` 字段、类型、默认值见上方英文表（字段名与默认值一致）。要点：
-- **colorfont**：`item` 必填 `input`/`outDir`/`fontName`；`codepointsFile` 默认 `<outDir>/<fontName>.codepoints.json`（码位锁，需提交，非缓存产物）。Vite 插件层额外 `watch`/`devFast`（dev woff2 q9）。
-- **svgIcons**：`item` 必填 `input`/`output.svg`；`color`/`normalize`/`formatter` 等可公共。
-- **bitmapIcons**：`item` 必填 `inputDir`/`output.image`/`output.style`；`padding`/`prefix`/`png`/`webp` 等可公共。
+- **colorfont**：`item` 必填 `sources` + `output.{dir,fontName,name}`（`output.ts?` 默认 true）；产物全落 `output.dir`，按 `output.name` 派生字体/`.css`/`.ts`/`.codepoints.json`（码位锁需提交，非缓存产物）。类名 = `classPrefix`（默认 `'icon'`）+ `classSeparator`（默认 `'-'`）：基类 `.icon`、每图类 `.icon-home`。Vite 插件层额外 `watch`/`devFast`（dev woff2 q9）。
+- **svgIcons**：`item` 必填 `sources` + `output.{dir,name}`（`output.ts?` 默认 true）；雪碧图/脚本/清单三产物恒产，落 `output.dir` 按 `name` 派生。`color`（svg 专属，`'keep'` 默认保留源多色 / `'mono'` 健壮单色，根 currentColor 由 CSS color 控制 / 函数逐色重映射；勿与 color-fonts 的 `colorFormat` 混淆）/`normalize`/`formatter` 等可公共。
+- **bitmapIcons**：`item` 必填 `sources` + `output.{dir,name}`（`output.ts?` 默认 true、`output.format?` 默认 webp）；图集/样式/脚本/JSON 四产物恒产，落 `output.dir` 按 `name` 派生。`classPrefix`（默认 `'icon'`）/`classSeparator`（默认 `'-'`）/`padding`/`png`/`webp` 等可公共（基类 `.icon`、每图类 `.icon-home`）。
 - **imagemin**：单例，`enabled` + 各格式 sharp 参数 + `svg`(svgo) + `svgSize`；⚠ 就地改写源文件（仅更小才写），母版放 `exclude`。
 - **unused**：找出**无人引用的文件**并写清单表,删除是独立步骤(`removeUnused`/`remove-unused`)。**不限资产** —— `ext`/`include` 接受任意后缀/glob(`.js`/`.ts`/`.json`…),图片/字体清单只是默认值。两种检测后端、同一份表:
-  - **模块图(精确)**:伞选项键 `unused?: UnusedDetectOptions | false`(`apply:'build'` 仅构建期,**只写表不删**);对代码尤其可靠(可达性=模块图)。经伞插件使用时,四引擎的输入/输出(colorfonts/svgIcons/bitmapIcons 的 `input`/`inputDir`/`output`/`outDir`)**自动排除**。
+  - **模块图(精确)**:伞选项键 `unused?: UnusedDetectOptions | false`(`apply:'build'` 仅构建期,**只写表不删**);对代码尤其可靠(可达性=模块图)。经伞插件使用时,三引擎的源目录与产物目录(colorfonts/svgIcons/bitmapIcons 的 `sources` + `output.dir`)**自动排除**,图标源与产物均不会被误判或误删。
   - **静态扫描(不依赖 vite)**:`findUnused()` / `remove-unused --scan` —— grep 源码引用,供 CLI/非 bundler 流水线;保守(宁留不误删),入口代码文件可能误报,代码场景优先用模块图后端或 `exclude` 排除入口。
   - 字段:`root`(默认 `'src'`)、`include`(候选 glob,省略则由 `ext` 生成)、`ext`(默认图片/字体/媒体后缀)、`exclude`(仓库根相对 glob,叠加在自动排除之上)、`output`(默认 `.cache.graphics/unused.json`)、`enabled`(默认 true);`findUnused` 另有 `sources`/`sourceRoot`。
   - 删除端 `removeUnused`/`remove-unused` 另有独立的 `include`/`exclude` 安全闸(与产表方式无关,`exclude` 优先级最高,命中者记入 `skipped`)。
@@ -565,7 +570,7 @@ const Icon = ({ name }: { name: IconName }) =>
 
 ### 消费 svg 产物
 
-`output.script` 入口把 sprite 以 URL 默认导入，并导出 `iconsHref`（sprite URL）、`iconsName`（名→id 对象）与 `IconName` 类型。用 `<use href="<sprite-url>#<id>">` 引用某个 symbol：
+生成的 `{name}` 脚本把 sprite 以 URL 默认导入，并导出 `iconsHref`（sprite URL）、`iconsName`（名→id 对象）与 `IconName` 类型。用 `<use href="<sprite-url>#<id>">` 引用某个 symbol：
 
 ```tsx
 // React / JSX
@@ -581,18 +586,18 @@ const SvgIcon = ({ name }: { name: IconName }) =>
 
 ### 消费 bitmap 产物
 
-样式产一个基类 `.<prefix>`（默认 `.sprite`）+ 每图类 `.<prefix>-<name>` —— 即 `<i class="sprite sprite-home">`。**只 import `output.script` 入口**：它会副作用引入样式（注入 CSS）与图集图（由 Vite 解析/带 hash），并导出 `iconsImage`（图集 URL）、`iconsName` 与 `IconName` 类型，你无需自己 import `.css`/图。
+样式产一个基类 `.icon`（基类选择器 `.${classPrefix}`）+ 每图类 `.icon-<name>`（`.${classPrefix}${classSeparator}${name}`）—— 即 `<i class="icon icon-home">`。**只 import 生成的脚本**：它会副作用引入样式（注入 CSS）与图集图（由 Vite 解析/带 hash），并导出 `iconsImage`（图集 URL）、`iconsName` 与 `IconName` 类型，你无需自己 import `.css`/图。
 
 ```ts
-import './sprites/sheet'   // output.script —— 注入 CSS + 解析图集图
+import './sprites/sheet'   // {name} 脚本 —— 注入 CSS + 解析图集图
 ```
 
 ```html
 <!-- 基类 + 每图类；每图类带默认 px 尺寸 + aspect-ratio，改元素 width 即按容器自适应 -->
-<i class="sprite sprite-home"></i>
+<i class="icon icon-home"></i>
 ```
 
-未产 `output.script` 时则直接 import 生成的样式（`import './sprites/sheet.css'`）—— 但此时图集图 URL 由 Vite 相对该 CSS 解析，这正是 script 入口替你处理的。
+不想用脚本时则直接 import 生成的样式（`import './sprites/sheet.css'`）—— 但此时图集图 URL 由 Vite 相对该 CSS 解析，这正是 script 入口替你处理的。
 
 ## 独立使用（Vite 之外）
 
@@ -602,17 +607,19 @@ import { svgIcons } from 'graphics-icon/svg'
 import { bitmapIcons } from 'graphics-icon/bitmap'
 import { imagemin, defaultOptions } from 'graphics-icon/imagemin'
 
-await colorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons', cacheFilename: 'cf.json' }] })
+await colorfonts({ colorFormat: 'auto', items: [{ sources: 'icons', output: { dir: 'fonts', fontName: 'AppIcons', name: 'AppIcons' }, cacheFilename: 'cf.json' }] })
+await svgIcons({ items: [{ sources: 'svg', output: { dir: 'out', name: 'icons' } }] })
+await bitmapIcons({ items: [{ sources: 'png', output: { dir: 'out', name: 'sheet' } }] })
 await imagemin(files, { ...defaultOptions })
 ```
 
-colorfont：`build(item)` 纯函数（不落盘）；`buildAndWrite(item)` 落盘，返回 `BuildResult | null`（`null`=命中）；`colorfonts({items})` 批量。
+colorfont：`build(item)` 纯函数（不落盘）；`buildAndWrite(item)` 落盘到 `output.dir`，返回 `BuildResult | null`（`null`=命中）；`colorfonts({items})` 批量。
 unused：`findUnused({ root, include?, ext?, exclude?, sources? })` 静态检测(不依赖 vite)写表；`removeUnused({ include?, exclude?, dryRun? })` 按表删除。
 
 ## CLI
 
 ```bash
-color-fonts build --input icons --out fonts --name AppIcons   # 另有 watch / check
+color-fonts build --sources icons --dir fonts --font-name AppIcons --name AppIcons   # 另有 watch / check
 svg-icons    --config ./svg.config.ts      # 配置 default-export { items: [...] }
 bitmap-icons --config ./bitmap.config.ts   # 配置 default-export { items: [...] }
 image-min    --all --config ./imagemin.config.ts   # 或传文件列表(pre-commit)
@@ -629,9 +636,9 @@ remove-unused --exclude "src/keep/**"              # 删除,遵守 include/exclu
 // svg.config.ts
 import type { SvgIconsOptions } from 'graphics-icon/svg'
 export default {
-  color: true,                                  // 公共 —— 合并进每个 item
+  color: 'mono',                                // 公共 —— 合并进每个 item
   items: [
-    { input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' } },
+    { sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' } },
   ],
 } satisfies SvgIconsOptions
 ```
@@ -640,9 +647,9 @@ export default {
 // bitmap.config.ts
 import type { BitmapIconsOptions } from 'graphics-icon/bitmap'
 export default {
-  prefix: 'sprite',                             // 公共
+  classPrefix: 'icon',                          // 公共（classSeparator 默认 '-'）
   items: [
-    { inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css', script: 'src/sprites/sheet.ts' } },
+    { sources: 'src/icons/png', output: { dir: 'src/sprites', name: 'sheet' } },
   ],
 } satisfies BitmapIconsOptions
 ```

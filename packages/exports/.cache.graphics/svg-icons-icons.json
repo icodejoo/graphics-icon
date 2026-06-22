@@ -1,5 +1,5 @@
 {
-  "configHash": "745b884217441ec1adc577e0e8df02833d9f3fd5b2808a0f223e591f0c639a9f",
+  "configHash": "eec7262a2c2459c008b13de5f6e8929c4488b5d35f9ff0029905e019a228b54a",
   "files": {
     "../color-fonts/fixtures/arrow-left.svg": "368d8f11b8808cf53f144551bce9d5667221e224efb1cec78c977950250677b4",
     "../color-fonts/fixtures/badge-grad.svg": "62299bc642267a4d82745a5cd650cb43540fe377b270bac15842ebd94607c7d4",
@@ -8,6 +8,7 @@
     "../color-fonts/fixtures/star.svg": "8123ed91285d84cfdb52f3d595abac465f3362918fd0c1a53dd00b4e624675ce"
   },
   "outputs": [
+    "test/.acc-svg/icons.json",
     "test/.acc-svg/icons.svg",
     "test/.acc-svg/icons.ts"
   ],

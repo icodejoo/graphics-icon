@@ -12,9 +12,9 @@ description: >-
 `private`,经 tsup `noExternal` 内联进 `packages/exports` 的 dist。
 
 ## 包结构(8 包)
-- `graphics-icon`(**packages/exports**)—— **唯一发布**物。5 个子路径出口 + 4 个 CLI bin。详见 `graphics-icon` skill。
-  - 子路径:`graphics-icon/vite`(伞插件 `graphicsIcon`,默认导出)、`/colorfont`(`build`/`buildAndWrite`/`colorfonts`/`runCli`)、`/svg`(`svgIcons`/`runCli`)、`/bitmap`(`bitmapIcons`/`runCli`)、`/imagemin`(`imagemin`/`defaultOptions`/`runCli`)、`/unused`(`removeUnused`/`findUnused`/`runCli`)。
-  - CLI:`color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`。
+- `graphics-icon`(**packages/exports**)—— **唯一发布**物。**6 个子路径出口 + 5 个语义 CLI bin**。详见 `graphics-icon` skill。
+  - 子路径(6):`graphics-icon/vite`(伞插件 `graphicsIcon`,默认导出)、`/colorfont`(`build`/`buildAndWrite`/`colorfonts`/`runCli`)、`/svg`(`svgIcons`/`runCli`)、`/bitmap`(`bitmapIcons`/`runCli`)、`/imagemin`(`imagemin`/`defaultOptions`/`runCli`)、`/unused`(`removeUnused`/`findUnused`/`runCli`)。
+  - CLI(5,语义名,旧 `g-*` 已弃):`color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`。
 - `@graphics-icon/vite-umbrella`(**packages/vite-plugin**)—— **私有**,仅含伞 Vite 插件 `graphicsIcon`(钩子多路复用);不发布,经 `graphics-icon/vite` 再导出。
 - `color-fonts` —— 彩色 webfont 引擎(纯 JS,本 skill 的深挖对象)+ CLI(`runCli`)。
 - `bitmap-icons` —— 位图雪碧图引擎(`bitmapIcons`)+ 内部插件工厂。
@@ -26,14 +26,17 @@ description: >-
 
 **统一形态**:四引擎都「双形态」——引擎函数 + CLI 可在 Vite 外单独用(各经自己的子路径导入),也经
 `graphicsIcon({...})` 集成。`graphicsIcon` 返回**单个**插件(钩子多路复用),按传入子键启停。
-**多实例**:`colorfont`/`svgIcons`/`bitmapIcons` 均为 `{ ...公共, items: [...] }`(公共参数合并进每项,项覆盖公共),
-每实例独立缓存 + 独立产物;`imagemin` 为单例。**按实例**缓存/错误:`cache?: boolean`(默认 true;false 删缓存+旧产物重建)、
+**多实例**:`colorfonts`/`svgIcons`/`bitmapIcons` 均为 `{ ...公共, items: [...] }`(公共参数合并进每项,项覆盖公共),
+每实例独立缓存 + 独立产物;`imagemin` 为单例。**三引擎统一形态**:源 `sources: string | string[]`(原 `input`/`inputDir`);
+输出 `output` —— colorfont `{dir,fontName,name,ts?}`、bitmap `{dir,name,ts?,format?}`、svg `{dir,name,ts?}`(产物全落 `dir` 按 `name` 派生,`ts` 默认 true);
+类名(colorfont+bitmap)`classPrefix`(默认 `'icon'`)+`classSeparator`(默认 `'-'`),svg 用 `<use href>` 无类名;
+颜色 —— svg `color: 'keep'|'mono'|ColorFn`(默认 `'keep'`)、colorfont `colorFormat: 'auto'|'mono'|'colrv0'|'otsvg'|'colrv1'`(默认 `'auto'`)。**按实例**缓存/错误:`cache?: boolean`(默认 true;false 删缓存+旧产物重建)、
 `throwable?: boolean`(默认 true 抛错中止,false 告警续跑);缓存文件名 Vite 用 `cacheName`(仅文件名)、独立用
 `cacheFilename`(全路径),统一落 `.cache.graphics/`,底层由 `@codejoo/utils` 的 `groupCache` 统管。各包另有自己的 SKILL.md。
 
 ## colorfont 构建管线(每次 build)
 1. `loadIcons` 读 SVG。
-2. `assignCodepoints`(码位锁 `<fontName>.codepoints.json`,默认落 `<outDir>`,PUA 从 0xE000,墓碑不回收;非缓存产物,需提交)。
+2. `assignCodepoints`(码位锁 `{name}.codepoints.json`,落 `output.dir`,PUA 从 0xE000;BMP 段耗尽溢出 PUA-A(0xF0000)/PUA-B(0x100000),三段全尽报错;墓碑不回收;状态产物非缓存,需提交)。
 3. **构建缓存检查**:key=sha256(引擎版本+影响产物的选项+图标内容+码位);命中直接复用上次字体字节,跳过 3–6。
 4. `prepareIcons`(worker 池,线程数=CPU 一半封顶 8):每图标 `normalizeSvg`(**复用 `@codejoo/utils/scale-svg`**,
    svgo×2 + viewBox 放大到 1024 整数化,故 `prepareOne` 为 async)→ `parseSvg` → `detectColor`(按色拆层)→
@@ -44,9 +47,9 @@ description: >-
    - otsvg:glyf base + 手写 `SVG ` 表注入。
    - colrv1:`buildColorGlyf` → 交 `write-fonts` wasm 加 COLR/CPAL(传 gid)。
    - 每档再 `toWoff2`(ttf2woff2 wasm,质量可配)/ `toWoff`(ttf2woff)。
-6. **实物落盘**:`buildAndWrite(item)` 用 `@codejoo/utils/fs-write` 的幂等写入,把字体 + `<fontName>.css`(双 @font-face +
-   tech 链)+ `<fontName>.ts`(`emitDts`:IconName 联合 + icons/baseName/colorIcons)+ `<fontName>.codepoints.json` 全部写进
-   `outDir`(内容未变不写,防 mtime/git/HMR 抖动)。**无 `virtual:colorfont*` 虚拟模块**——消费方用真实 import:
+6. **实物落盘**:`buildAndWrite(item)` 用 `@codejoo/utils/fs-write` 的幂等写入,把字体 + `{name}.css`(双 @font-face +
+   tech 链)+ `{name}.{ts|js}`(`emitDts`:IconName 联合 + icons/baseName/colorIcons)+ `{name}.json`(公开元数据清单)+ `{name}.codepoints.json` 全部写进
+   `output.dir`(内容未变不写,防 mtime/git/HMR 抖动)。文本产物(css/ts/js)头部加 `@codejoo/utils/banner` 双语 banner,JSON 无 banner。**无 `virtual:colorfont*` 虚拟模块**——消费方用真实 import:
    `import './fonts/AppIcons.css'` + `import { icons, type IconName } from './fonts/AppIcons'`。`emitDemo`/gallery 选项已移除。
 
 ## colorfont 关键选型抉择(及为什么)
@@ -59,7 +62,7 @@ description: >-
 - **woff2 用 ttf2woff2(Rust)→wasm**:可调质量。实测 q9 比 q11 快 ~31×、体积仅 +6%。默认 dev=9 / 生产=11。
 - **构建缓存**:命中复用上次产物,重复构建 ~10×(1852ms→186ms)。
 - **dev 冷启动不阻塞**:plugin `buildStart` 不 await(后台生成),HMR/watch 按需 await。产物实物落盘,消费方走真实 import(无虚拟模块)。
-- **稳定码位**:PUA 从 0xE000,墓碑策略,每字体 `<fontName>.codepoints.json` 提交。
+- **稳定码位**:PUA 从 0xE000,墓碑策略,每字体 `{name}.codepoints.json` 提交。
 
 ## 实测(1000 图标基准)
 - 生产 q11 ~2.9–3.2s;dev q9 ~1.7s;单色 mono q9 ~1.35s。
@@ -75,7 +78,7 @@ wasm32-unknown-unknown` + `wasm-bindgen … --target nodejs --out-dir pkg`;**pkg
 `{"type":"commonjs"}`**。发布包(`packages/exports`)`build` = tsup + `scripts/copy-wasm.mjs`(把两个 pkg 拷进 dist/woff2、dist/colrv1)。
 
 ## 易踩的点
-- 改 colorfont 产物格式 → bump `cache/build-cache.ts` 的 `VERSION`,否则缓存供旧产物。
+- 改任一引擎产物格式 → bump 该引擎的 `GENERATOR_VERSION`/`CACHE_VERSION`(colorfont 在 `cache/build-cache.ts`),否则缓存供旧产物。
 - 改 wasm → 重编 + `copy-wasm`;wasm-bindgen 版本须与 crate 对齐。
 - **`graphicsIcon` 返回单个 Plugin**(非数组),消费方 `plugins: [graphicsIcon({...})]` 不展开。
 - colorfont 插件选项类型叫 `ColorfontOptions`(在 `@graphics-icon/vite-umbrella` 的 `colorfont-plugin.ts`),引擎同名类型在

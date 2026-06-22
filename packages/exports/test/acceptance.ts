@@ -56,14 +56,14 @@ await viteBuild({
       colorfonts: {
         colorFormat: 'auto',
         formats: ['woff2', 'woff'],
-        items: [{ input: fixtures, outDir: gen, fontName: 'AccIcons' }],
+        items: [{ sources: fixtures, output: { dir: gen, fontName: 'AccIcons', name: 'AccIcons' } }],
       },
       svgIcons: {
         color: true,
         items: [
-          { input: fixtures, output: { svg: join(svgGen, 'icons.svg'), script: join(svgGen, 'icons.ts') } },
+          { sources: fixtures, output: { dir: svgGen, name: 'icons' } },
           // 额外实例:输入在 unusedRoot/icons 下 → 其 a.svg 应被 unused 自动排除(引擎输入,不应误删)。
-          { input: resolve(unusedRoot, 'icons'), output: { svg: join(svgGen, 'extra.svg'), script: join(svgGen, 'extra.ts') } },
+          { sources: resolve(unusedRoot, 'icons'), output: { dir: svgGen, name: 'extra' } },
         ],
       },
       // 未使用资产检测:扫描 unusedRoot;引擎输入(icons/**)由伞插件自动排除。

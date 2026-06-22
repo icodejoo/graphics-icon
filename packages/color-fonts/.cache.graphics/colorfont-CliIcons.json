@@ -1,5 +1,5 @@
 {
-  "configHash": "df8a1679e13c6b79cffdd517b1dbb8a5014c68b2beaf0a4715abf12e5d8beadb",
+  "configHash": "8cd118d8dd0cb3bd2f8d6784c15449358ac1e1363cd4dc4fb5a1acae48ca31d0",
   "files": {
     "fixtures/arrow-left.svg": "368d8f11b8808cf53f144551bce9d5667221e224efb1cec78c977950250677b4",
     "fixtures/badge-grad.svg": "62299bc642267a4d82745a5cd650cb43540fe377b270bac15842ebd94607c7d4",
@@ -11,6 +11,7 @@
     ".test-out/CliIcons.colrv0.woff",
     ".test-out/CliIcons.colrv0.woff2",
     ".test-out/CliIcons.css",
+    ".test-out/CliIcons.json",
     ".test-out/CliIcons.mono.woff",
     ".test-out/CliIcons.mono.woff2",
     ".test-out/CliIcons.otsvg.woff",

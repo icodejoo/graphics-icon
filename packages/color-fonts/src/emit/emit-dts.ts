@@ -1,4 +1,5 @@
 import { autoGenBanner } from '@codejoo/utils/banner'
+import { deriveClassNames } from '@codejoo/utils/class-names'
 
 import type { FontMetadata, ResolvedOptions } from '../types.ts'
 
@@ -13,14 +14,18 @@ export function emitScript(metadata: FontMetadata, o: ResolvedOptions): string {
   const q = (s: string) => JSON.stringify(s)
   const hex = (n: number) => '0x' + n.toString(16)
 
+  // 由裸词 classPrefix + classSeparator 派生:HTML 每图类名与基类名 baseName。
+  // Derive HTML class names and baseName from the bare-word classPrefix + classSeparator.
+  const { className, baseName: derivedBaseName } = deriveClassNames(o.classPrefix, o.classSeparator)
+
   const cp = glyphs.map((g) => `  ${q(g.name)}: ${hex(g.codepoint)},`).join('\n')
-  const cls = glyphs.map((g) => `  ${q(g.name)}: ${q(o.classPrefix + g.name)},`).join('\n')
+  const cls = glyphs.map((g) => `  ${q(g.name)}: ${q(className(g.name))},`).join('\n')
   // 对象形式:便于外部 O(1) 判定 colorIcons[name] 是否彩色(只列出彩色图标)
   const colorObj = glyphs
     .filter((g) => g.color)
     .map((g) => `  ${q(g.name)}: true,`)
     .join('\n')
-  const baseName = q(o.baseSelector.replace(/^\./, ''))
+  const baseName = q(derivedBaseName)
 
   // ── .js:无任何 TS 类型(去掉 IconName 联合、as const satisfies、参数类型注解) ──
   if (!o.ts) {

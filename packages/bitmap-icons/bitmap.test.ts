@@ -45,7 +45,7 @@ await png("imgs/star.png", 0, 255, 0)
 // 新 shape:output: { dir, name, ts?, format? };四类产物全部恒产,路径全派生。
 const opts = (cache = true) => ({
   padding: 2,
-  prefix: "icon", // 公共参数:合并进 item
+  classPrefix: "icon", // 公共参数(裸词,默认值):合并进 item
   cache,
   items: [{ sources: "imgs", output: { dir: "out", name: "sheet" } }], // format 默认 webp、ts 默认 true
 })
@@ -61,6 +61,13 @@ check(readFileSync("out/sheet.css", "utf8").startsWith(autoGenBanner("block")), 
 check(readFileSync("out/sheet.ts", "utf8").includes(autoGenBanner("line").trim()), "banner: ts 含 line 注释 banner")
 // ts:true 默认 → .ts 产 IconName 字符串联合(供代码提示)。
 check(readFileSync("out/sheet.ts", "utf8").includes("export type IconName ="), "ts:true emits IconName union")
+// classPrefix="icon" + classSeparator="-"(默认) → 基类 .icon、每图 .icon-<name>(裸词直接拼,非 .undefined/.sprite)。
+const sheetCss = readFileSync("out/sheet.css", "utf8")
+check(/(^|\n)\.icon\s*\{/.test(sheetCss), "classPrefix: 基类选择器 .icon 生成")
+check(sheetCss.includes(".icon-home {") && sheetCss.includes(".icon-star {"), "classPrefix: 每图选择器 .icon-<name> 生成")
+check(!sheetCss.includes(".undefined") && !sheetCss.includes(".sprite"), "classPrefix: 无 .undefined/.sprite 残留")
+// 不变性:默认裸词产出的类与改动前(含点 .icon-)一致 —— 不应出现双点 ..icon / ..icon--。
+check(!sheetCss.includes("..icon"), "classPrefix: 裸词派生无双点 ..icon 残留")
 const cacheFile = resolve(root, ".cache.graphics/bitmap-icons-sheet.json")
 check(existsSync(cacheFile), "per-instance cache file written (bitmap-icons-sheet.json)")
 check(!hadHit(), "1st run = miss")
@@ -89,7 +96,7 @@ await png("imgs-a/alpha.png", 12, 34, 56)
 await png("imgs-b/beta.png", 78, 90, 120)
 const multiOpts = {
   padding: 2,
-  prefix: "icon",
+  classPrefix: "icon",
   items: [{ sources: ["imgs-a", "imgs-b"], output: { dir: "out-multi", name: "sheet" } }],
 }
 await capture(() => bitmapIcons(multiOpts))
@@ -101,7 +108,7 @@ check(multiNames.includes("alpha") && multiNames.includes("beta"), "multi-source
 // ── format: 'png' + ts: false ──
 // format:png → 图集扩展名为 .png(非 .webp);ts:false → 产 .js 且无 export type。
 const pngJsOpts = {
-  prefix: "icon",
+  classPrefix: "icon",
   items: [{ sources: "imgs-a", output: { dir: "out-pngjs", name: "sheet", format: "png" as const, ts: false } }],
 }
 await capture(() => bitmapIcons(pngJsOpts))
@@ -111,6 +118,19 @@ check(existsSync("out-pngjs/sheet.css") && existsSync("out-pngjs/sheet.json"), "
 const jsSrc = readFileSync("out-pngjs/sheet.js", "utf8")
 check(!jsSrc.includes("export type"), "ts:false .js has no `export type`")
 check(jsSrc.includes("iconsImage") && jsSrc.includes("iconsName"), "ts:false .js still has runtime iconsImage/iconsName")
+
+// ── classSeparator 自定义分隔符 ──
+// classPrefix:"icon" + classSeparator:"__" → 基类仍 .icon、每图 .icon__<name>(裸词 + 自定义分隔符直接拼)。
+const sepOpts = {
+  classPrefix: "icon",
+  classSeparator: "__",
+  items: [{ sources: "imgs-a", output: { dir: "out-sep", name: "sheet" } }],
+}
+await capture(() => bitmapIcons(sepOpts))
+const sepCss = readFileSync("out-sep/sheet.css", "utf8")
+check(/(^|\n)\.icon\s*\{/.test(sepCss), "classSeparator: 基类选择器仍 .icon")
+check(sepCss.includes(".icon__alpha {"), "classSeparator:'__' → 每图选择器 .icon__<name>")
+check(!sepCss.includes(".icon-alpha {"), "classSeparator:'__' → 不再用默认 '-' 分隔符")
 
 // ── 空输入 + 清理陈旧产物 ──
 // 捕获 warn,判定是否抛出

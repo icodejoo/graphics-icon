@@ -4,6 +4,12 @@ import type { ColorfontItem, ResolvedOptions } from './types.ts'
 
 const DEFAULT_PA_START = 0xe000
 
+/** classPrefix 默认值(裸词,无前导点、无尾连字符)。 / Default class prefix (bare word). */
+export const DEFAULT_CLASS_PREFIX = 'icon'
+
+/** classSeparator 默认值(基类与图标名之间的连接符)。 / Default class separator. */
+export const DEFAULT_CLASS_SEPARATOR = '-'
+
 /** 填充默认值,规范化路径(单字体实例)。 */
 export function resolveOptions(o: ColorfontItem): ResolvedOptions {
   if (!o.sources) throw new Error('colorfont: 缺少 sources')
@@ -20,6 +26,11 @@ export function resolveOptions(o: ColorfontItem): ResolvedOptions {
   )
   const name = o.output.name
 
+  // classPrefix(裸词,默认 'icon')+ classSeparator(默认 '-')为用户选项;CSS 选择器/类名由二者按需派生(见 @codejoo/utils/class-names)。
+  // classPrefix (bare word) + classSeparator are user options; selectors/class names are derived on demand.
+  const classPrefix = o.classPrefix ?? DEFAULT_CLASS_PREFIX
+  const classSeparator = o.classSeparator ?? DEFAULT_CLASS_SEPARATOR
+
   return {
     sources,
     dir,
@@ -30,8 +41,8 @@ export function resolveOptions(o: ColorfontItem): ResolvedOptions {
     unitsPerEm,
     ascender,
     descender,
-    baseSelector: o.baseSelector ?? '.icon',
-    classPrefix: o.classPrefix ?? 'icon-',
+    classPrefix,
+    classSeparator,
     colorFormat: o.colorFormat ?? 'auto',
     // formats 唯一来源:默认仅 woff2(所有现代浏览器);要 .woff 写 ['woff2','woff']
     formats: o.formats ?? ['woff2'],

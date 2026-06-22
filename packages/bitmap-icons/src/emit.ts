@@ -1,6 +1,6 @@
 /**
  * 雪碧图边车文件生成:
- *   · 样式(CSS):一套类 —— 基类 .${prefix} + 每图 .${prefix}-${name}。
+ *   · 样式(CSS):一套类 —— 由裸词 classPrefix(默认 icon)+ classSeparator(默认 -)派生:基类选择器=`.${classPrefix}`(.icon)、每图=`.${classPrefix}${classSeparator}${name}`(.icon-home)。
  *       每图类带「px 默认尺寸 + aspect-ratio + 百分比 background-size/position」:
  *       默认按 px 尺寸显示(项目可经 pxtorem 等转 rem/vw);改元素 width(或 width/height)
  *       即按容器自适应铺满。background-image 用「相对 image 的 url()」,交 Vite 解析。
@@ -15,6 +15,7 @@
  */
 
 import { autoGenBanner } from "@codejoo/utils/banner"
+import { deriveClassNames } from "@codejoo/utils/class-names"
 import { writeTextIfChanged } from "@codejoo/utils/fs-write"
 import { relTo } from "@codejoo/utils/path-rel"
 
@@ -23,7 +24,8 @@ import type { IconManifest, IconSheetMeta } from "./types.ts"
 const round = (n: number): number => Math.round(n * 10000) / 10000
 
 interface StyleCtx {
-  prefix: string
+  classPrefix: string
+  classSeparator: string
   imagePath: string
   sheetW: number
   sheetH: number
@@ -32,16 +34,21 @@ interface StyleCtx {
 
 /** 单套类,适配任意尺寸容器(详见文件头)。background-image 用 style→image 的相对 url()。 / One class set, adapts to any container size; relative url(). */
 export function emitStyle(out: string, manifest: IconManifest, ctx: StyleCtx): void {
-  const { prefix, sheetW, sheetH } = ctx
+  const { classPrefix, classSeparator, sheetW, sheetH } = ctx
   const r = ctx.pixelRatio || 1
   const url = relTo(out, ctx.imagePath)
+  // 由裸词 classPrefix + classSeparator 派生选择器/类名(单一真相,见 @codejoo/utils/class-names):
+  // 基类选择器=`.${classPrefix}`(.icon);每图选择器=`.${classPrefix}${classSeparator}${name}`(.icon-home)。
+  // 注释里的用法示例用 HTML 类名(无前导点)。 / Derive selectors/class names from the bare classPrefix + classSeparator.
+  const { baseSelector: baseSel, baseName: baseCls, perSelector, className } = deriveClassNames(classPrefix, classSeparator)
+  const sampleCls = className("foo")
   const lines: string[] = [
     // 用 /* */ 块注释:纯 CSS 不支持 // 行注释(PostCSS 会报 Unknown word)
-    `/* 用法:<i class="${prefix} ${prefix}-foo"></i>`,
+    `/* 用法:<i class="${baseCls} ${sampleCls}"></i>`,
     " *   · 默认按 width(px,可经 pxtorem 等转 rem/vw)显示,高度按 aspect-ratio 自动;",
     " *   · 改元素 width(或同时设 width/height)即按容器自适应铺满 —— 背景按百分比缩放/定位,与 CSS 单位、像素密度无关。",
     " */",
-    `.${prefix} {`,
+    `${baseSel} {`,
     "  display: inline-block;",
     `  background-image: url("${url}");`,
     "  background-repeat: no-repeat;",
@@ -54,7 +61,7 @@ export function emitStyle(out: string, manifest: IconManifest, ctx: StyleCtx): v
     const px = sheetW === f.width ? 0 : round((f.x / (sheetW - f.width)) * 100)
     const py = sheetH === f.height ? 0 : round((f.y / (sheetH - f.height)) * 100)
     lines.push(
-      `.${prefix}-${name} {`,
+      `${perSelector(name)} {`,
       `  width: ${round(f.width / r)}px;`,
       `  aspect-ratio: ${f.width} / ${f.height};`,
       `  background-size: ${sx}% ${sy}%;`,

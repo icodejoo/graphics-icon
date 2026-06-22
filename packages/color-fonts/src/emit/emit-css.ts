@@ -1,4 +1,5 @@
 import { autoGenBanner } from '@codejoo/utils/banner'
+import { deriveClassNames } from '@codejoo/utils/class-names'
 
 import type { FontAsset, FontFlavor, FontFormat, FontMetadata, ResolvedOptions } from '../types.ts'
 
@@ -62,6 +63,9 @@ export function emitCss(
 ): string {
   const byColor = groupByColor(assets)
   const ff = q(o.fontName)
+  // 由裸词 classPrefix + classSeparator 派生:基类选择器(`.${classPrefix}`)、每图选择器(`.${classPrefix}${classSeparator}${name}`)。
+  // Derive base selector and per-icon selector from the bare-word classPrefix + classSeparator.
+  const { baseSelector, perSelector } = deriveClassNames(o.classPrefix, o.classSeparator)
   /** 一条 src 项:url + format(+ tech) + 行尾浏览器注释。 */
   const entry = (a: FontAsset, tech: string | null, note: string) =>
     `url(${q(resolveUrl(a))}) format(${q(cssFormat(a.format))})${tech ? ` tech(${tech})` : ''} /* ${note} */`
@@ -99,7 +103,7 @@ export function emitCss(
 
   // 基类:强制图标字体(!important 压过继承),其余字体属性继承上下文(大小/粗细/行高随文本)。
   css += `
-${o.baseSelector} {
+${baseSelector} {
   font: inherit;
   font-family: ${ff} !important;
   -webkit-font-smoothing: antialiased;
@@ -109,7 +113,7 @@ ${o.baseSelector} {
   css += metadata.glyphs
     .map(
       (g) =>
-        `.${o.classPrefix}${g.name}::before { content: "\\${g.codepoint.toString(16)}"; }`,
+        `${perSelector(g.name)}::before { content: "\\${g.codepoint.toString(16)}"; }`,
     )
     .join('\n')
 

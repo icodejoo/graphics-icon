@@ -12,8 +12,8 @@ description: >-
 把四个引擎组合成**一个** Vite 插件 `graphicsIcon`,并**按需启用**:只有被传入且非 `false` 的子能力才会实例化。
 本包是**私有的**(`private: true`,`@graphics-icon/vite-umbrella`),**不发布**——它**只含伞 Vite 插件**(`graphicsIcon` +
 合并/插件壳)。对外发布物是 `graphics-icon`(在 **packages/exports**),由它把本包再导出为 `graphics-icon/vite`,并额外提供
-各引擎子路径(`graphics-icon/colorfont` `/svg` `/bitmap` `/imagemin`)与 4 个 CLI。其余引擎包(`color-fonts`、
-`bitmap-icons`、`svg-icons`、`@codejoo/imagemin`、`@codejoo/utils`)都是私有内部实现,tsup 在 `packages/exports` 构建时
+各引擎子路径(**6 个**:`graphics-icon/colorfont` `/svg` `/bitmap` `/imagemin` `/vite` `/unused`)与 **5 个 CLI**(语义名 `color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`,旧 `g-*` 已弃)。其余引擎包(`color-fonts`、
+`bitmap-icons`、`svg-icons`、`@codejoo/imagemin`、`unused`、`@codejoo/utils`)都是私有内部实现,tsup 在 `packages/exports` 构建时
 通过 `noExternal` 内联进发布包 `dist`。
 
 ## 功能(四子能力,均为「双形态」)
@@ -34,9 +34,9 @@ description: >-
 - 消费方:`plugins: [graphicsIcon({...})]`(**不要展开**)。
 
 ## colorfont 实物落盘(无虚拟模块)
-colorfont 把真实的 `<fontName>.css`、`<fontName>.ts`、字体文件、`<fontName>.codepoints.json` 写进 `outDir`,
+colorfont 把真实的 `{name}.css`、`{name}.{ts|js}`、字体文件、`{name}.json`(公开元数据清单)、`{name}.codepoints.json`(码位锁)写进 `output.dir`,
 消费方用**普通 import** 取用——**不再有 `virtual:colorfont` / `virtual:colorfont.css` 虚拟模块**,合并器也不再需要
-`resolveId`/`load`:
+`resolveId`/`load`(但 `load` 仍在 FANOUT_HOOKS 里,供 `unused` 检测器用):
 
 ```ts
 import './fonts/AppIcons.css'                        // @font-face + .icon 类
@@ -52,8 +52,15 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 - `imagemin?: ImageminPluginOptions | false`(`= Partial<ImageminOptions> & { enabled? }`,**单例**)
 - `unused?: UnusedDetectOptions | false`(构建期经模块图检测无用文件,写 `.cache.graphics/unused.json`,**只写表不删**;自动排除四引擎输入/输出。**不限资产**——`ext`/`include` 任意后缀。删除是独立的 `removeUnused`/`remove-unused`,带 `include`/`exclude` 安全闸;不走 vite 时用 `findUnused`/`remove-unused --scan` 静态检测)
 
-**多实例**:`colorfont`/`svgIcons`/`bitmapIcons` 均为 `{ ...公共, items: [item, …] }`——公共参数合并进每个 item
+**多实例**:`colorfonts`/`svgIcons`/`bitmapIcons` 均为 `{ ...公共, items: [item, …] }`——公共参数合并进每个 item
 (item 覆盖公共),每个 item = 一套独立缓存 + 独立产物。`imagemin` 为单例。
+
+**三引擎统一形态**(item 字段):
+- 源:`sources: string | string[]`(原 `input`/`inputDir`;svg 多目录用临时 staging 汇集,bitmap/colorfont 自行枚举)。imagemin 不变(`include`/`exclude` 就地压缩,无 `sources`/`output`/`items`)。
+- 输出 `output`:colorfont `{ dir, fontName, name, ts? }`、bitmap `{ dir, name, ts?, format? }`(`format ∈ 'webp'|'png'`,默认 webp)、svg `{ dir, name, ts? }`。产物全落 `dir` 按 `name` 派生;`ts?` 默认 true(`.ts` 含 `IconName` 联合,`false` → `.js` 无类型)。
+- 类名(仅 colorfont + bitmap;svg 用 `<use href>` 无类名):`classPrefix?`(裸词,默认 `'icon'`)+ `classSeparator?`(默认 `'-'`),经 `@codejoo/utils/class-names` 的 `deriveClassNames` 派生(取代旧 colorfont `baseSelector` / bitmap `prefix`)。
+- svg `color?: 'keep' | 'mono' | ColorFn`(默认 `'keep'`);colorfont `colorFormat?: 'auto'|'mono'|'colrv0'|'otsvg'|'colrv1'`(默认 `'auto'`)。
+- 文本产物(css/ts/js/svg)头部加 `@codejoo/utils/banner` 双语 banner;`{name}.json` 清单纯数据无 banner(bitmap=坐标 frames;svg=`{sprite,icons[]}`;colorfont=元数据 `{fontName,unitsPerEm,glyphs[]}`)。
 
 ## 按实例缓存 / 错误处理(替代旧的 cacheDir/cacheFile)
 - ~~插件级 `cacheDir`、各引擎全路径 `cacheFile`~~ **已移除**。
@@ -71,7 +78,7 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 - `svgIconsVite(opts)` 工厂仍返回 **Plugin[]**,但这是**内部**用法;对外只经 `graphicsIcon({ svgIcons })`。
 - colorfont 插件选项类型叫 `ColorfontOptions`(在本包 `colorfont-plugin.ts`),引擎同名类型在 import 处别名为
   `ColorfontEngineOptions`;别再用旧名 `VitePluginColorfontOptions`。
-- **发布相关在 `packages/exports`**:子路径出口、4 个 CLI bin、tsup `entry`/`dts.resolve`、`scripts/copy-wasm.mjs`
+- **发布相关在 `packages/exports`**:6 个子路径出口、5 个语义 CLI bin、tsup `entry`/`dts.resolve`、`scripts/copy-wasm.mjs`
   (把 colorfont 的 woff2/colrv1 crate `pkg` 拷入 `dist/{woff2,colrv1}`)、以及把第三方运行时依赖列入 `dependencies`
   (svgo/svgpath/sharp/maxrects-packer/vite-plugin-icons-spritesheet/scale-that-svg/cubic2quad/opentype.js/svg2ttf/
   ttf2woff;**`fflate` 已移除**)——均在发布包,不在本私有包。`vite` 为 peer。

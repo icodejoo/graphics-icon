@@ -52,8 +52,10 @@ export interface BitmapIconsCommon {
   png?: PngOptions
   /** 透传 sharp.webp()(image 为 .webp 时)。默认 { quality: 80, effort: 6 }。 */
   webp?: WebpOptions
-  /** CSS 类名前缀:基类 .${prefix} + 每图类 .${prefix}-${name}。默认 "sprite"。 */
-  prefix?: string
+  /** 类名前缀(裸词:无点、无尾连字符),默认 "icon"。基类选择器 = `.${classPrefix}`(.icon),每图选择器 = `.${classPrefix}${classSeparator}${name}`(.icon-home)。 / Bare class prefix (no dot, no trailing hyphen), default "icon". */
+  classPrefix?: string
+  /** 前缀与精灵名之间的分隔符,默认 "-";每图选择器 = `.${classPrefix}${classSeparator}${name}`(.icon-home)。 / Separator between prefix and sprite name, default "-". */
+  classSeparator?: string
   /** 由源文件「基础名(无扩展名)」生成精灵名。默认原样。名字须匹配 /^[a-zA-Z_][\w-]*$/。 */
   nameTransformer?: (basename: string) => string
   /** 纳入的图片 glob(相对每个源目录)。默认 ["**\/*.{png,jpg,jpeg,webp,avif}"]。 */

@@ -15,6 +15,7 @@
   - 样式 `{dir}/{name}.css`（**只产 CSS，已砍掉 SCSS**）；
   - 入口脚本 `{dir}/{name}.{ts ? 'ts' : 'js'}`（`ts?: boolean` 默认 `true`；**恒产**）；
   - 坐标 JSON `{dir}/{name}.json`（**恒产**，不再可选）。
+- **类名**：`classPrefix?: string` 为**裸词**（无点、无尾连字符），默认 `'icon'`；`classSeparator?: string` 默认 `'-'`。派生出基类选择器 `.${classPrefix}`（`.icon`）与每图选择器 `.${classPrefix}${classSeparator}${name}`（`.icon-home`）。HTML 用法 `<i class="icon icon-home"></i>`。
 - 无 `publicPath`（CSS 用「style→image 相对 url()」、script 用相对 import，均交 Vite 解析/带 hash）；产物 `*.sprite.{webp,png}` 命名会被自动排除出源扫描，故可与源图同目录；每组生成幂等（内容未变不写盘 → 不触发 HMR 循环）。
 
 ## 单独使用 / Standalone
@@ -31,10 +32,13 @@ await bitmapIcons({
   items: [
     // sources 可传单个目录，或目录数组（多个源目录全部枚举后合并打进同一张雪碧图）
     // output: { dir, name, ts?, format? } —— 四类产物（图集/css/脚本/json）路径全派生且恒产
-    { sources: 'src/icons/png', prefix: 'icon',
+    // classPrefix 为裸词（无点、无尾连字符），默认 'icon'；classSeparator 默认 '-'
+    // → 基类选择器 .icon、每图选择器 .icon-<name>（如 .icon-home）
+    { sources: 'src/icons/png', classPrefix: 'icon',
       output: { dir: 'src/sprites', name: 'sheet' } }, // → sheet.webp / sheet.css / sheet.ts / sheet.json
+    // 自定义分隔符示例：classSeparator: '__' → 每图选择器 .icon__<name>
     // format:'png' + ts:false 示例（图集产 .png、脚本产 .js）：
-    { sources: ['src/icons/png', 'src/icons/extra'], prefix: 'extra',
+    { sources: ['src/icons/png', 'src/icons/extra'], classPrefix: 'icon', classSeparator: '__',
       output: { dir: 'src/sprites', name: 'extra', format: 'png', ts: false } }, // → extra.png / extra.css / extra.js / extra.json
   ],
 })

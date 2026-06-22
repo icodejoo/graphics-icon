@@ -26,24 +26,35 @@ description: >-
 extends 引擎选项;引擎 `types.ts` 的同名类型在 import 处别名 `ColorfontEngineOptions`)。
 公共第三方依赖经根 `pnpm-workspace.yaml` 的 `catalog:` 统一版本。**本包现依赖 `@codejoo/utils`**(归一化/幂等写入/统一 `groupCache`)。
 
+## 选项形态(最终 API)
+- 源:`sources: string | string[]`(原 `input`/`inputDir`;bitmap/color-fonts 自行枚举多源)。
+- 输出:`output: { dir, fontName, name, ts? }`。`dir`=输出目录;`fontName`=CSS `@font-face` font-family + OpenType name 表字体名(**取代旧 `fontName`+`fontFamily`**);`name`=产物基名;`ts?`默认 true。
+  产物全落 `dir`、按 `name` 派生:字体 `{name}.{flavor}.{format}`(`flavor ∈ mono/colrv0/otsvg/colrv1`、`format ∈ woff2/woff/ttf`)、`{name}.css`、`{name}.{ts|js}`、`{name}.json`(公开元数据清单)、`{name}.codepoints.json`(**码位锁,固定派生不可配置** —— 旧 `codepointsFile` 选项已删)。
+- 类名(给 .css 用):`classPrefix?`(裸词,默认 `'icon'`)+ `classSeparator?`(默认 `'-'`),经 `@codejoo/utils/class-names` 的 `deriveClassNames` 派生(与 bitmap 共用);**取代旧 `baseSelector`**。
+- 颜色:`colorFormat?: 'auto'|'mono'|'colrv0'|'otsvg'|'colrv1'`(默认 `'auto'`;单色仅 mono,多色产 colrv0+otsvg(+colrv1)+mono)。
+- `ts?`(默认 true):`.ts` 含 `IconName` 联合;`false` → `.js` 仅运行时对象无类型。
+
 ## 构建管线(每次 build,要点)
-loadIcons 读 SVG → assignCodepoints(码位锁 `<fontName>.codepoints.json`,默认落 `<outDir>`,PUA 0xE000,墓碑不回收)→ 构建缓存检查
+loadIcons 读 SVG → assignCodepoints(码位锁 `{name}.codepoints.json`,落 `output.dir`,PUA 0xE000,墓碑不回收)→ 构建缓存检查
 (命中复用上次字节)→ prepareIcons(worker 池,封顶 8;每图标 normalizeSvg(**复用 `@codejoo/utils/scale-svg`**,
 svgo×2 + viewBox 放大 1024 整数化,故 `prepareOne` 为 async)→ parseSvg → detectColor → toOutline)→
 buildFlavors(mono=svg2ttf;colrv0=手写 COLRv0+CPAL 注入;otsvg=手写 `SVG ` 表注入;colrv1=write-fonts wasm)
-→ 各档 toWoff2/toWoff → `buildAndWrite(item)` 用 `@codejoo/utils/fs-write` 幂等写入,把字体 + `<fontName>.css`(双 @font-face + tech 链)
-+ `<fontName>.ts`(emitDts)+ `<fontName>.codepoints.json` 全部写进 `outDir`。**实物落盘,无虚拟模块**;消费方 `import './fonts/AppIcons.css'`
-+ `import { icons, type IconName } from './fonts/AppIcons'`。`colorfonts({items})` 多实例批量(每 item 独立缓存/产物)。`emitDemo`/gallery 已移除。
+→ 各档 toWoff2/toWoff → `buildAndWrite(item)` 用 `@codejoo/utils/fs-write` 幂等写入,把字体 + `{name}.css`(双 @font-face + tech 链)
++ `{name}.{ts|js}`(emitDts:`IconName` 联合 + icons/baseName/colorIcons)+ `{name}.json`(公开元数据清单 `{fontName,unitsPerEm,glyphs:[{name,codepoint,color,flavors}]}`)+ `{name}.codepoints.json` 全部写进 `output.dir`。
+文本产物(css/ts/js)头部加 `@codejoo/utils/banner` 双语「自动生成、请勿修改」banner;JSON 纯数据无 banner。
+**实物落盘,无虚拟模块**;消费方 `import './fonts/AppIcons.css'` + `import { icons, type IconName } from './fonts/AppIcons'`。`colorfonts({items})` 多实例批量(每 item 独立缓存/产物)。`emitDemo`/gallery 已移除。
+码位锁(`{name}.codepoints.json`)是**状态非缓存产物**(`cache:false` 保留),与公开清单 `{name}.json`(派生产物)职责不同。
 
 ## 关键选型(及为什么)
 - 引擎全 glyf 不用 CFF(opentype.js 只能写 CFF;glyf 更小、解锁 woff2 生态),opentype.js 降为只读解析。
 - COLRv1 必须 Rust→wasm(纯 JS 写不出);OT-SVG 与 COLRv1 **共存**(Safari 不渲染 COLRv1,Chromium 不渲染 OT-SVG)。
 - woff2 用 ttf2woff2(Rust→wasm),质量可配(默认 dev=9 / 生产=11);q9 比 q11 快约 31×,体积仅 +6%。
 - 构建缓存(参考 imagemin 内容哈希):命中复用,重复构建快约 10×;dev 冷启动 `buildStart` 不 await。
-- 稳定码位:PUA 从 0xE000,墓碑策略,每字体 `<fontName>.codepoints.json` 提交。
+- 稳定码位:PUA 从 0xE000,墓碑策略,每字体 `{name}.codepoints.json` 提交。BMP PUA(0xE000–0xF8FF)耗尽后溢出补充平面 PUA-A(0xF0000)/PUA-B(0x100000),三段全耗尽才报错。
 
 ## 维护易踩点
-- 改引擎产物格式 → bump `src/cache/build-cache.ts` 的 `VERSION` 常量,否则缓存供旧产物。
+- 改引擎产物格式 → bump `src/cache/build-cache.ts` 的 `GENERATOR_VERSION`/`CACHE_VERSION`,否则缓存供旧产物。
+- 空输入默认抛错(走 `throwable`,`false` 告警续跑);输入读失败传播;worker 回退前告警。`configHash` 纳入 `classPrefix`/`classSeparator`/`name`/`ts`/`colorFormat`/`paStart` 等影响产物的选项。
 - 改 wasm → 重编 + `scripts/copy-wasm.mjs`;wasm-bindgen 版本须与 crate 对齐;`pkg/package.json` 须 `{"type":"commonjs"}`。
 - 发布包(`packages/exports`)tsup 内联本包源码但**不**内联第三方依赖 → 这些依赖(svg2ttf/svgo/svgpath/cubic2quad/opentype.js/ttf2woff)
   必须列在发布包 `dependencies`,vite 为 peer。**`fflate` 已移除**(未使用)。

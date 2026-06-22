@@ -252,6 +252,16 @@ const tsText = readFileSync("out/struct/Struct.ts", "utf8")
 check(cssText.startsWith(autoGenBanner("block")), "banner: css 首部含 block 注释 banner")
 check(tsText.startsWith(autoGenBanner("line")), "banner: ts 首部含 line 注释 banner")
 
+// ───────── 默认类命名不变性:classPrefix 默认 'icon' + classSeparator 默认 '-' 派生须与改动前(含点 '.icon-')逐字节一致 ─────────
+// 基类规则 '.icon {' + 每图 '.icon-<name>::before';baseName==='icon'、icons[name]==='icon-<name>'。
+check(cssText.includes(".icon {"), "默认 'icon'+'-': css 含基类 '.icon {'(.${classPrefix})")
+// fixtures 含 'home' 图标 → 每图选择器须为 '.icon-home::before'。
+check(fxNames.includes("home"), "fixtures: 含 home 图标(供默认命名断言)")
+check(cssText.includes(".icon-home::before"), "默认 'icon'+'-': css 含每图 '.icon-home::before'")
+// ts 入口:baseName = classPrefix = 'icon';icons.home 类名 = 'icon-home'(prefix+sep+name)。
+check(tsText.includes('export const baseName = "icon";'), "默认 'icon'+'-': ts baseName === 'icon'")
+check(tsText.includes('"home": "icon-home"'), "默认 'icon'+'-': ts icons['home'] === 'icon-home'")
+
 // ───────── 产物命名:字体 = {name}.{flavor}.{format}(flavor 段必须保留,否则多档同名覆盖) ─────────
 const assetNamePat = /^Struct\.(mono|colrv0|otsvg|colrv1)\.(woff2|woff|ttf)$/
 check(
@@ -292,10 +302,28 @@ check(hitRun === null, "configHash: 同配置重跑 = HIT(buildAndWrite 返回 n
 const missRun = await buildAndWrite({ ...baseHashOpts, woff2Quality: 5 })
 check(missRun !== null, "configHash: 改 woff2Quality → configHash 变 → MISS(返回非 null)")
 // 改 classPrefix(进 configHash 且改变 css 的 ::before 选择器)→ MISS 且 css 内容变化。
-const missRun2 = await buildAndWrite({ ...baseHashOpts, classPrefix: "ic2-" })
+// classPrefix 现为裸词前缀(无前导点、无尾连字符,如 'ic2')。
+const missRun2 = await buildAndWrite({ ...baseHashOpts, classPrefix: "ic2" })
 check(missRun2 !== null, "configHash: 改 classPrefix → MISS")
 const css2 = readFileSync(cssPath, "utf8")
 check(css1 !== css2 && css2.includes(".ic2-"), "configHash: 代表产物 .css 内容随 classPrefix 刷新(非假绿)")
+// 基类选择器 = `.${classPrefix}` → '.ic2',每图 ::before = '.ic2-<name>'(默认分隔符 '-')。
+check(css2.includes(".ic2 {") && css2.includes(".ic2-home::before"), "classPrefix='ic2': 基类 .ic2 + 每图 .ic2-<name>")
+
+// classSeparator 自定义:'__' → 基类仍 '.icon'、每图 '.icon__home::before';ts baseName 仍 'icon'、icons.home='icon__home'。
+const sepDir = "out/sep"
+await capture(() =>
+  buildAndWrite({ sources: fixtures, output: { dir: sepDir, fontName: "SepIcons", name: "SepIcons" }, colorFormat: "auto", formats: ["woff2"], classSeparator: "__" }).then(() => undefined),
+)
+const sepCss = readFileSync(resolve(sepDir, "SepIcons.css"), "utf8")
+const sepTs = readFileSync(resolve(sepDir, "SepIcons.ts"), "utf8")
+check(sepCss.includes(".icon {"), "classSeparator='__': 基类选择器仍 '.icon'(分隔符不影响基类)")
+check(sepCss.includes(".icon__home::before"), "classSeparator='__': 每图选择器 '.icon__home::before'")
+check(sepTs.includes('export const baseName = "icon";'), "classSeparator='__': ts baseName 仍 'icon'")
+check(sepTs.includes('"home": "icon__home"'), "classSeparator='__': ts icons['home'] === 'icon__home'")
+// classSeparator 进 configHash:改分隔符 → MISS。
+const sepMiss = await buildAndWrite({ sources: fixtures, output: { dir: sepDir, fontName: "SepIcons", name: "SepIcons" }, colorFormat: "auto", formats: ["woff2"], classSeparator: "--" })
+check(sepMiss !== null, "configHash: 改 classSeparator → MISS")
 
 // ───────── 码位墓碑/稳定性(核心契约):assignCodepoints 纯函数 ─────────
 // [a,b,c] 分配 → 删 b 重跑 → b present=false 且码位不变、a/c 不动 → b 加回 → 复用原码位。

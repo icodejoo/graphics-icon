@@ -36,7 +36,7 @@ await viteBuild({
       colorfonts: {
         colorFormat: 'colrv1',
         formats: ['woff2'],
-        items: [{ input: fixtures, outDir: gen, fontName: 'AccIcons' }],
+        items: [{ sources: fixtures, output: { dir: gen, fontName: 'AccIcons', name: 'AccIcons' } }],
       },
     }),
   ],

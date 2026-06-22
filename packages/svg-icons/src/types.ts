@@ -4,20 +4,22 @@
  */
 
 /**
- * 颜色改写策略：
- *   · true            → fill/stroke 改为 currentColor（跟随 CSS color）
- *   · string          → 改为该颜色
- *   · falsy/undefined → 什么都不做
- *   · 函数            → 对每处颜色调用 (name=文件名/symbolId, symbolId, 原颜色)；
- *                       返回真值字符串则替换为该值，返回 falsy 则保留原样
- * Color rewrite strategy:
- *   · true      → fill/stroke become currentColor (follows CSS color)
- *   · string    → replace with that color
- *   · falsy     → no-op
- *   · function  → called per color as (name, symbolId, currentColor); truthy string replaces, falsy keeps
+ * 颜色改写策略（默认 'keep'）：
+ *   · 'keep'（默认）/省略 → 什么都不做，保留源 svg 的多色（仅做 id 作用域化）
+ *   · 'mono'              → 健壮单色：移除描述元素的具体色/渐变（保留 none/currentColor），
+ *                           在每个 <symbol> 根设 fill+stroke=currentColor → 靠 SVG 继承，由 CSS `color` 统一控制
+ *                           （连未显式写 fill 的元素也跟随；经 <use> 实例化时 currentColor 解析到使用处 color）
+ *   · 函数                → 逐色重映射（保留多色结构）：对每处具体颜色调用 (name=symbolId, symbolId, 原颜色)；
+ *                           返回真值字符串则替换为该值，返回 falsy 则保留原样
+ * Color strategy (default 'keep'):
+ *   · 'keep' (default) → no-op, keep the source multicolor (id-scoping still applies)
+ *   · 'mono'           → robust monochrome: strip concrete colors/gradients (keep none/currentColor) and set
+ *                        fill+stroke=currentColor on each <symbol> root → CSS `color` controls the whole icon
+ *   · function         → per-color remap (keeps multicolor): called per concrete color (name, symbolId, color);
+ *                        truthy string replaces, falsy keeps
  */
 export type ColorFn = (name: string, symbolId: string, color: string) => string | false | null | undefined
-export type ColorOption = boolean | string | ColorFn | null | undefined
+export type ColorOption = "keep" | "mono" | ColorFn | null | undefined
 
 /**
  * 归一化 / 缩放策略（默认关闭 → 行为不变，安全）：

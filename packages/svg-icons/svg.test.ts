@@ -43,7 +43,7 @@ writeFileSync("icons/star.svg", `<svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-
 
 // output 新 shape：{ dir, name, ts? }。三产物路径派生：out/icons.{svg,ts,json}
 const opts = (cache = true) => ({
-  color: true as const, // 公共参数:合并进 item
+  color: "mono" as const, // 公共参数:合并进 item
   cache,
   items: [{ sources: "icons", output: { dir: "out", name: "icons" } }],
 })
@@ -58,6 +58,10 @@ const tsText = readFileSync("out/icons.ts", "utf8")
 check(svgText.includes(autoGenBanner("xml").trim()), "banner: sprite svg 含 xml 注释 banner")
 check(tsText.startsWith(autoGenBanner("line")), "banner: 入口 ts 首部含 line 注释 banner")
 check(tsText.includes("export type IconName ="), "ts:default 产 IconName 联合类型")
+// color:'mono' → 健壮单色:每个 symbol 根设 fill+stroke=currentColor;内部具体色(#333)被移除(继承根)。
+check(/<symbol\b[^>]*\bfill="currentColor"/.test(svgText), "color:'mono' → symbol 根含 fill=currentColor")
+check(/<symbol\b[^>]*\bstroke="currentColor"/.test(svgText), "color:'mono' → symbol 根含 stroke=currentColor")
+check(!svgText.includes("#333"), "color:'mono' → 内部具体色 #333 被移除(继承根 currentColor)")
 // json 清单:纯数据,无 banner;含 sprite 文件名 + icons symbol id 列表。
 const jsonText = readFileSync("out/icons.json", "utf8")
 const manifest = JSON.parse(jsonText) as { sprite: string; icons: string[] }
@@ -147,7 +151,7 @@ rmSync("b/dup.svg")
 // ── 空输入 ──
 mkdirSync("empty", { recursive: true })
 const emptyOpts = (throwable?: boolean) => ({
-  color: true as const,
+  color: "mono" as const,
   items: [{ sources: "empty", output: { dir: "out", name: "empty" }, ...(throwable === undefined ? {} : { throwable }) }],
 })
 const e1 = await captureWarn(() => svgIcons(emptyOpts()))
@@ -156,6 +160,69 @@ check(e1.threw, "empty input default throws")
 // throwable:false → 不抛(告警续跑)
 const e2 = await captureWarn(() => svgIcons(emptyOpts(false)))
 check(!e2.threw, "empty input throwable:false does not throw")
+
+// ── color:'mono' 边界:保留 none、移除 url(渐变)、根 fill+stroke=currentColor ──
+mkdirSync("mono", { recursive: true })
+// 一个图标:具体 fill(#abc)、stroke(#def)、fill="none"(镂空,须保留)、fill="url(#g)"(渐变,须移除)。
+writeFileSync(
+  "mono/m.svg",
+  `<svg viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/></linearGradient></defs>` +
+    `<path d="M0 0h24v24H0z" fill="#abc" stroke="#def"/><path d="M4 4h4v4H4z" fill="none"/><circle cx="12" cy="12" r="6" fill="url(#g)"/></svg>`,
+)
+await capture(() => svgIcons({ color: "mono" as const, items: [{ sources: "mono", output: { dir: "outmono", name: "m" } }] }))
+const monoSvg = readFileSync("outmono/m.svg", "utf8")
+check(/<symbol\b[^>]*\bfill="currentColor"[^>]*\bstroke="currentColor"|<symbol\b[^>]*\bstroke="currentColor"[^>]*\bfill="currentColor"/.test(monoSvg), "mono: 根 symbol 同时含 fill+stroke=currentColor")
+check(!monoSvg.includes('"#abc"') && !monoSvg.includes('"#def"'), "mono: 描述元素具体色被移除")
+check(monoSvg.includes('fill="none"'), "mono: fill=none 被保留(镂空不被填实)")
+check(!/\bfill="url\(/.test(monoSvg), "mono: url(渐变) fill 被移除(继承根 currentColor)")
+
+// ── color 为函数:逐色重映射,保留多色结构(不注入根 currentColor、不 strip) ──
+mkdirSync("fn", { recursive: true })
+writeFileSync("fn/f.svg", `<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="#111"/></svg>`)
+const remap: ColorFn = (_n, _id, c) => (c === "#111" ? "#999" : c)
+await capture(() => svgIcons({ color: remap, items: [{ sources: "fn", output: { dir: "outfn", name: "f" } }] }))
+const fnSvg = readFileSync("outfn/f.svg", "utf8")
+check(fnSvg.includes('fill="#999"'), "fn: #111 被重映射为 #999")
+check(!fnSvg.includes('"#111"'), "fn: 原色 #111 已替换")
+check(!/<symbol\b[^>]*\bfill="currentColor"/.test(fnSvg), "fn: 不注入根 currentColor(保留多色语义,区别于 mono)")
+
+// ── color 省略(默认 'keep'):保留源多色,不注入 currentColor ──
+mkdirSync("keep", { recursive: true })
+writeFileSync("keep/k.svg", `<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="#abc"/></svg>`)
+await capture(() => svgIcons({ items: [{ sources: "keep", output: { dir: "outkeep", name: "k" } }] })) // 不设 color → 默认 keep
+const keepSvg = readFileSync("outkeep/k.svg", "utf8")
+check(keepSvg.includes('fill="#abc"'), "keep(默认): 源具体色 #abc 原样保留")
+check(!/<symbol\b[^>]*\bfill="currentColor"/.test(keepSvg), "keep(默认): 不注入根 currentColor")
+
+// ── id 作用域化(修 issue #38):两图标各含同名内部 id + url(#)/href 引用 → 作用域化后不撞、引用仍正确 ──
+// id scoping: two icons each with the same internal id + url(#)/href refs → scoped without collision, refs intact.
+mkdirSync("scope", { recursive: true })
+// 两个文件都内部定义 id="c"(clipPath)与 id="g"(渐变),并以 url(#c)/url(#g)/href="#g" 引用——跨图标同名。
+writeFileSync(
+  "scope/one.svg",
+  `<svg viewBox="0 0 24 24"><defs><clipPath id="c"><rect width="24" height="24"/></clipPath>` +
+    `<linearGradient id="g"><stop offset="0" stop-color="#f00"/></linearGradient></defs>` +
+    `<g clip-path="url(#c)"><rect width="24" height="24" fill="url(#g)"/></g><use href="#g"/></svg>`,
+)
+writeFileSync(
+  "scope/two.svg",
+  `<svg viewBox="0 0 24 24"><defs><clipPath id="c"><circle cx="12" cy="12" r="12"/></clipPath>` +
+    `<linearGradient id="g"><stop offset="0" stop-color="#00f"/></linearGradient></defs>` +
+    `<g clip-path="url(#c)"><circle cx="12" cy="12" r="12" fill="url(#g)"/></g><use href="#g"/></svg>`,
+)
+// color 省略(keep)→ 不动颜色,只看 id 作用域化效果。
+await capture(() => svgIcons({ items: [{ sources: "scope", output: { dir: "outscope", name: "s" } }] }))
+const scopeSvg = readFileSync("outscope/s.svg", "utf8")
+// 1) 内部 id 按各自 symbol id 加前缀(one__c / one__g / two__c / two__g)→ 不再有裸 id="c"/id="g"。
+check(scopeSvg.includes('id="one__c"') && scopeSvg.includes('id="one__g"'), "scope: one 内部 id 加前缀(one__c/one__g)")
+check(scopeSvg.includes('id="two__c"') && scopeSvg.includes('id="two__g"'), "scope: two 内部 id 加前缀(two__c/two__g)")
+check(!/\bid="c"/.test(scopeSvg) && !/\bid="g"/.test(scopeSvg), "scope: 无裸内部 id(c/g 全部被作用域化)")
+// 2) url(#)/href 引用同步改写到带前缀 id,且各自指向本 symbol(不跨图标撞)。
+check(scopeSvg.includes("url(#one__c)") && scopeSvg.includes("url(#one__g)") && scopeSvg.includes('href="#one__g"'), "scope: one 内引用改写为 one__* 前缀")
+check(scopeSvg.includes("url(#two__c)") && scopeSvg.includes("url(#two__g)") && scopeSvg.includes('href="#two__g"'), "scope: two 内引用改写为 two__* 前缀")
+check(!/url\(#c\)/.test(scopeSvg) && !/url\(#g\)/.test(scopeSvg) && !/href="#g"/.test(scopeSvg), "scope: 无裸引用(url(#c)/url(#g)/href=#g 全部被作用域化)")
+// 3) <symbol id="..."> 本身(图标名)绝不被加前缀。
+check(/<symbol\b[^>]*\bid="one"/.test(scopeSvg) && /<symbol\b[^>]*\bid="two"/.test(scopeSvg), "scope: symbol 根 id(图标名 one/two)不被改动")
 
 process.chdir(resolve(root, ".."))
 rmSync(root, { recursive: true, force: true })

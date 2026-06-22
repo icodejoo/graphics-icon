@@ -36,33 +36,105 @@ import type { ColorOption, NormalizeOption } from "./types.ts"
 // 仅匹配「真正的颜色属性」；url(#..) 引用、none、currentColor 在替换时跳过
 const COLOR_ATTR = /\b(fill|stroke|stop-color)="([^"]+)"/g
 
+/**
+ * 按 <symbol> 切分 sprite（同步、纯函数）：对每个 symbol 调 fn(attrs, inner) 取其替换内容，拼回整张 sprite。
+ * 统一以下三处共用的同一切分模式：颜色逐色重映射（applyColorFn）、单色（applyMono）、id 作用域化（scope-ids）。
+ * fn 返回的字符串即该 symbol 的完整替换（含 <symbol>…</symbol> 标签），symbol 之外的文本原样保留。
+ *
+ * Split a sprite per <symbol> (sync, pure): call fn(attrs, inner) for each symbol to get its replacement,
+ * then stitch the sprite back together. Shared by applyColorFn / applyMono / scopeIconIds — the same split
+ * pattern. fn returns the full replacement for that symbol (including the <symbol>…</symbol> tags); text
+ * outside symbols is kept verbatim.
+ */
+export function mapSymbols(sprite: string, fn: (attrs: string, inner: string) => string): string {
+  return sprite.replace(/<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/g, (_full: string, attrs: string, inner: string) => fn(attrs, inner))
+}
+
 /** 默认归一化目标宽度（与 colorfont 的 normalizeSvg 默认一致）。 / Default normalize width (== colorfont). */
 const DEFAULT_NORMALIZE_WIDTH = 1024
 
-function resolveColor(opt: ColorOption, name: string, symbolId: string, current: string): string | null {
-  if (opt === true) return "currentColor"
-  if (typeof opt === "string") return opt
-  if (typeof opt === "function") {
-    const r = opt(name, symbolId, current)
-    return r ? r : null
-  }
-  return null
-}
-
-/** 按 color 策略改写每个 <symbol> 内 fill/stroke/stop-color 的颜色值（纯函数）。 */
-export function applyColor(sprite: string, opt: ColorOption): string {
-  if (!opt) return sprite
-  return sprite.replace(/<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/g, (_full: string, attrs: string, inner: string) => {
+/** color 为函数：逐色重映射（保留多色结构）。 / Function form: per-color remap (keeps multicolor). */
+function applyColorFn(sprite: string, fn: ColorFn): string {
+  return mapSymbols(sprite, (attrs: string, inner: string) => {
     const idm = /\bid="([^"]+)"/.exec(attrs)
     const symbolId = idm ? idm[1] : ""
     // iconNameTransformer 默认为 identity，故文件名 ≈ symbolId；此处以 symbolId 充当 name
     const rewrite = (s: string): string =>
       s.replace(COLOR_ATTR, (m: string, prop: string, val: string) => {
         if (val === "none" || val === "currentColor" || val.startsWith("url(")) return m
-        const next = resolveColor(opt, symbolId, symbolId, val)
+        const next = fn(symbolId, symbolId, val)
         return next ? `${prop}="${next}"` : m
       })
     return `<symbol${rewrite(attrs)}>${rewrite(inner)}</symbol>`
+  })
+}
+
+/** 按 color 策略改写颜色（纯函数）：'mono'=健壮单色 / 函数=逐色重映射 / 'keep'(默认)|falsy=不处理。 */
+export function applyColor(sprite: string, opt: ColorOption): string {
+  if (opt === "mono") return applyMono(sprite)
+  if (typeof opt === "function") return applyColorFn(sprite, opt)
+  return sprite // 'keep' / undefined / null → 保留源多色,不处理
+}
+
+// 单色模式：保留的颜色值（none = 镂空必须保留；currentColor = 已是目标）。
+// Mono mode: color values to keep (none = cutout, must keep; currentColor = already the target).
+function isKeepColor(val: string): boolean {
+  return val.trim() === "none" || val.trim() === "currentColor"
+}
+
+// 单色模式下处理内联 style：删除其中具体色的 fill:/stroke: 声明，保留 none/currentColor 及其它声明。
+// Mono: in an inline style, drop concrete fill:/stroke: declarations; keep none/currentColor and other decls.
+function stripStyleColors(style: string): string {
+  return style
+    .split(";")
+    .map((d) => d.trim())
+    .filter((d) => d.length > 0)
+    .filter((decl) => {
+      const m = /^(fill|stroke)\s*:\s*(.+)$/i.exec(decl)
+      if (!m) return true // 非 fill/stroke 声明一律保留 / keep non-fill/stroke declarations
+      return isKeepColor(m[2]) // 具体色/渐变 → 删除（false）；none/currentColor → 保留（true）
+    })
+    .join("; ")
+}
+
+// 单色模式下处理一段属性串：删具体色 fill/stroke/stop-color 属性、净化 style 内 fill/stroke。
+// Mono: within an attribute string, strip concrete fill/stroke/stop-color attrs and sanitize style fill/stroke.
+function stripMonoAttrs(s: string): string {
+  // 1) 颜色属性：none/currentColor 保留，其余（具体色 + url(#…) 渐变/pattern）整属性删除。
+  let out = s.replace(COLOR_ATTR, (m: string, _prop: string, val: string) => (isKeepColor(val) ? m : ""))
+  // 2) 内联 style：净化其中的 fill:/stroke: 声明（其它样式保留）；净化后为空则删除整个 style 属性。
+  out = out.replace(/\bstyle="([^"]*)"/g, (m: string, style: string) => {
+    const cleaned = stripStyleColors(style)
+    return cleaned ? `style="${cleaned}"` : ""
+  })
+  return out
+}
+
+// 在 symbol 开标签属性上设/替换某属性为 currentColor。 / Set or replace an attr to currentColor on the symbol tag.
+function setCurrentColorAttr(attrs: string, prop: "fill" | "stroke"): string {
+  const re = new RegExp(`\\b${prop}="[^"]*"`)
+  if (re.test(attrs)) return attrs.replace(re, `${prop}="currentColor"`)
+  return `${attrs} ${prop}="currentColor"`
+}
+
+/**
+ * 强制单色（纯函数、幂等）：对每个 <symbol>——
+ *   · 内部所有元素：删除具体色 fill/stroke/stop-color（含 url(#…) 渐变/pattern）与 style 内同名声明，
+ *     保留 none（镂空）与 currentColor；
+ *   · symbol 根元素：设/替换 fill="currentColor" 与 stroke="currentColor"。
+ * 经 <use> 实例化时由使用处 CSS color 统一染色。再次运行结果不变（幂等）。
+ *
+ * Force single-color (pure, idempotent): for each <symbol>, strip concrete fill/stroke/stop-color (incl.
+ * url(#…)) and same-named style decls inside (keeping none/currentColor), and set fill/stroke="currentColor"
+ * on the symbol root. Idempotent: a second pass yields the same output.
+ */
+export function applyMono(sprite: string): string {
+  return mapSymbols(sprite, (attrs: string, inner: string) => {
+    // 根 attrs：先剥离其上的具体色（避免遗留），再设 fill/stroke=currentColor。
+    let rootAttrs = stripMonoAttrs(attrs)
+    rootAttrs = setCurrentColorAttr(rootAttrs, "fill")
+    rootAttrs = setCurrentColorAttr(rootAttrs, "stroke")
+    return `<symbol${rootAttrs}>${stripMonoAttrs(inner)}</symbol>`
   })
 }
 

@@ -80,6 +80,22 @@ await colorfonts({ colorFormat: 'auto', items: [{ sources: 'icons', output: { di
 
 > `{name}.json` (manifest) is a **build-derived public product** — machine-readable, lists only icons emitted this build, no comments. `{name}.codepoints.json` (lock) is committed **state**: the stable codepoint source with tombstones, excluded from the cache key. Different file names, different roles.
 
+### 类命名 / Class naming
+
+CSS / 脚本入口的类名由两个选项控制：**`classPrefix`** —— **裸词类前缀**（无前导点、无尾连字符），默认 **`icon`**；**`classSeparator`** —— 基类与图标名之间的分隔符，默认 **`-`**。由二者派生（实现见 `src/options.ts` 的 `deriveClassNames`，全包复用）：
+
+| 派生项 | 规则 | 默认（`classPrefix='icon'`、`classSeparator='-'`） |
+| --- | --- | --- |
+| 基类选择器（`.css` 挂 font-family） | `.${classPrefix}` | `.icon` |
+| 每图选择器（`.css` 的 `::before`） | `.${classPrefix}${classSeparator}${name}` | `.icon-home` |
+| HTML 基类名（脚本入口 `baseName`） | `classPrefix` | `icon` |
+| HTML 每图类名（脚本入口 `icons[name]`） | `${classPrefix}${classSeparator}${name}` | `icon-home` |
+
+例：`classPrefix: 'ic2'` → 基类 `.ic2`、每图 `.ic2-home`、`baseName='ic2'`、`icons.home='ic2-home'`。
+自定义分隔符：`classSeparator: '__'` → 基类仍 `.icon`、每图 `.icon__home`、`baseName='icon'`、`icons.home='icon__home'`。
+
+> Class names are controlled by two options: **`classPrefix`** — a **bare-word prefix** (no leading dot, no trailing hyphen; default `icon`), which is also the HTML base class name — and **`classSeparator`** (default `-`), the connector between the base prefix and the icon name. The base selector is `.${classPrefix}`; the per-icon class is `${classPrefix}${classSeparator}${name}`.
+
 ### CLI
 
 ```bash

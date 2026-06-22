@@ -34,7 +34,7 @@ remove-unused --scan --ext .js,.ts,.json              # CLI 同理(裸名自动�
 import graphicsIcon from 'graphics-icon/vite'
 export default {
   plugins: [graphicsIcon({
-    svgIcons: { items: [{ input: 'src/icons', output: { svg: 'src/sprites/icons.svg' } }] },
+    svgIcons: { items: [{ sources: 'src/icons', output: { dir: 'src/sprites', name: 'icons' } }] },
     unused: { root: 'src', exclude: ['src/legacy/**'] }, // 引擎 input/产物自动排除
   })],
 }

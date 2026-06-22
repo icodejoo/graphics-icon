@@ -1,0 +1,61 @@
+{
+  "fontName": "AccIcons",
+  "unitsPerEm": 1000,
+  "glyphs": [
+    {
+      "name": "arrow-left",
+      "codepoint": 57344,
+      "color": false,
+      "flavors": [
+        "mono",
+        "colrv0",
+        "otsvg",
+        "colrv1"
+      ]
+    },
+    {
+      "name": "badge-grad",
+      "codepoint": 57345,
+      "color": true,
+      "flavors": [
+        "mono",
+        "colrv0",
+        "otsvg",
+        "colrv1"
+      ]
+    },
+    {
+      "name": "home",
+      "codepoint": 57346,
+      "color": false,
+      "flavors": [
+        "mono",
+        "colrv0",
+        "otsvg",
+        "colrv1"
+      ]
+    },
+    {
+      "name": "logo-color",
+      "codepoint": 57347,
+      "color": true,
+      "flavors": [
+        "mono",
+        "colrv0",
+        "otsvg",
+        "colrv1"
+      ]
+    },
+    {
+      "name": "star",
+      "codepoint": 57348,
+      "color": false,
+      "flavors": [
+        "mono",
+        "colrv0",
+        "otsvg",
+        "colrv1"
+      ]
+    }
+  ]
+}

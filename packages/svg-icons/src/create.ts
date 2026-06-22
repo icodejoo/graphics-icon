@@ -26,11 +26,11 @@ import type { GroupInput } from "@codejoo/utils/cache"
 import type { Plugin } from "vite"
 
 // 生成器版本：改后处理逻辑/产物结构/缓存模型时 +1,使旧缓存失效。
-const GENERATOR_VERSION = "6"
+const GENERATOR_VERSION = "7"
 
 // 函数无法稳定序列化 → 用 toString() 参与指纹（改了颜色函数即视为配置变化）。
 function serializeColor(c: ColorOption): string {
-  return typeof c === "function" ? `fn:${c.toString()}` : JSON.stringify(c ?? null)
+  return typeof c === "function" ? `fn:${c.toString()}` : JSON.stringify(c ?? "keep")
 }
 
 /** 合并公共参数到每个 item（item 同名字段覆盖公共）。 / Merge common into each item (item wins). */

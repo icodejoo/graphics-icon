@@ -46,6 +46,10 @@
     "./banner": {
       "types": "./src/banner.ts",
       "import": "./src/banner.ts"
+    },
+    "./class-names": {
+      "types": "./src/class-names.ts",
+      "import": "./src/class-names.ts"
     }
   },
   "files": ["src"],

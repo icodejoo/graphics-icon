@@ -24,7 +24,7 @@ await svgIcons({
   items: [
     // output 与 colorfont 统一为 { dir, name, ts? }；三产物恒产：
     //   {dir}/{name}.svg（雪碧图）、{dir}/{name}.{ts?ts:js}（脚本）、{dir}/{name}.json（清单）
-    { sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' }, color: true },
+    { sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' }, color: 'mono' }, // color: 'keep'(默认)|'mono'|函数;省略 = 'keep'
     // sources 也可为多目录数组（合进同一张 sprite，同名 svg 跨目录冲突会报错）：
     //   { sources: ['src/icons/a', 'src/icons/b'], output: { dir: 'src/sprites', name: 'merged' } }
     // ts:false → 产 {name}.js（仅运行时对象，无 IconName 类型）

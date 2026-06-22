@@ -3,7 +3,7 @@
  * Umbrella Vite plugin: composes the four engines under one option set, returns a SINGLE plugin.
  *
  * 组合 / Composes:
- *   · colorfont    —— 一组 SVG 图标 → 彩色 webfont,**实物落盘**到 outDir(.woff2/.woff + .css + .ts)。
+ *   · colorfont    —— 一组 SVG 图标 → 彩色 webfont,**实物落盘**到 output.dir(.woff2/.woff + .css + .ts)。
  *   · svgIcons     —— SVG <symbol> 雪碧图(svg-icons 插件工厂)。
  *   · bitmapIcons  —— 位图雪碧图(bitmap-icons 插件工厂)。
  *   · imagemin     —— 构建产物图片压缩(closeBundle)。
@@ -76,24 +76,26 @@ export interface GraphicsIconOptions {
 }
 
 /**
- * 收集四引擎的「输入目录(/**) + 产物路径」作为 unused 检测的排除项 —— 引擎消费资产但不被源码 import,
- * 不排除会被误判为未使用而误删。仅取各实例 items 上可靠存在的 input/output 字段。
+ * 收集三引擎的「源目录(/**) + 产物目录(/**)」作为 unused 检测的排除项 —— 引擎消费资产但不被源码 import,
+ * 不排除会被误判为未使用而误删。三引擎产物现全部落在 `output.dir` 下,故按目录整段排除即可。
  */
 function engineExcludes(options: GraphicsIconOptions): string[] {
   const out: string[] = []
   // 归一为「仓库根(cwd)相对、正斜杠」——与 unusedVite 候选路径的匹配口径一致(绝对/相对配置皆可)。
   const rel = (p: string): string => relative(process.cwd(), resolve(p)).replace(/\\/g, '/')
   const dirGlob = (p: string): string => `${rel(p).replace(/\/+$/, '')}/**`
-  const pushDir = (input: string | string[] | undefined): void => {
-    for (const d of Array.isArray(input) ? input : input ? [input] : []) out.push(dirGlob(d))
+  const pushDirs = (sources: string | string[] | undefined): void => {
+    for (const d of Array.isArray(sources) ? sources : sources ? [sources] : []) out.push(dirGlob(d))
   }
-  const pushFile = (p: string | undefined): void => {
-    if (p) out.push(rel(p))
+  // 每个 item:源目录(可 string|string[])+ 产物目录 output.dir 各整段排除。
+  const pushItem = (it: { sources: string | string[]; output: { dir: string } }): void => {
+    pushDirs(it.sources)
+    out.push(dirGlob(it.output.dir))
   }
 
-  if (options.colorfonts) for (const it of options.colorfonts.items ?? []) { pushDir(it.input); if (it.outDir) out.push(dirGlob(it.outDir)) }
-  if (options.svgIcons) for (const it of options.svgIcons.items ?? []) { pushDir(it.input); pushFile(it.output?.svg); pushFile(it.output?.script) }
-  if (options.bitmapIcons) for (const it of options.bitmapIcons.items ?? []) { pushDir(it.inputDir); pushFile(it.output?.image); pushFile(it.output?.style); pushFile(it.output?.script); pushFile(it.output?.json) }
+  if (options.colorfonts) for (const it of options.colorfonts.items ?? []) pushItem(it)
+  if (options.svgIcons) for (const it of options.svgIcons.items ?? []) pushItem(it)
+  if (options.bitmapIcons) for (const it of options.bitmapIcons.items ?? []) pushItem(it)
   return out
 }
 
@@ -105,7 +107,7 @@ function mapItems<T extends { cacheName?: string }>(items: T[]): Array<Omit<T, '
   })
 }
 
-/** 某文件是否落在某 input 目录内(用于 watch 判定)。 */
+/** 某文件是否落在某源目录内(用于 watch 判定)。 */
 function underAny(file: string, dirs: string[]): boolean {
   const f = resolve(file)
   return dirs.some((d) => {
@@ -118,7 +120,7 @@ function underAny(file: string, dirs: string[]): boolean {
 function colorfontsVite(opts: ColorfontPluginOptions): Plugin {
   const { watch, devFast, items, ...common } = opts
   const baseItems = mapItems(items) as ColorfontItem[]
-  const inputDirs = items.flatMap((it) => (Array.isArray(it.input) ? it.input : [it.input])).map((d) => resolve(d))
+  const inputDirs = items.flatMap((it) => (Array.isArray(it.sources) ? it.sources : [it.sources])).map((d) => resolve(d))
   let isBuild = false
 
   const run = async (): Promise<void> => {

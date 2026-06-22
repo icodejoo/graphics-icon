@@ -70,7 +70,8 @@ function configHashOf(item: BitmapIconsItem, paths: ReturnType<typeof derivePath
     pot: item.pot ?? false,
     square: item.square ?? false,
     pixelRatio: item.pixelRatio ?? 1,
-    prefix: item.prefix ?? "sprite",
+    classPrefix: item.classPrefix ?? "icon",
+    classSeparator: item.classSeparator ?? "-",
     name: item.output.name,
     format: paths.format,
     ts: item.output.ts ?? true,
@@ -122,7 +123,7 @@ function cleanupStaleOutputs(cacheFile: string): void {
  * Generate one sheet via groupCache; returns whether it was a cache hit.
  */
 export async function generateSheet(item: BitmapIconsItem): Promise<boolean> {
-  const { sources, padding = 2, maxWidth = 4096, maxHeight = 4096, pot = false, square = false, pixelRatio = 1, prefix = "sprite" } = item
+  const { sources, padding = 2, maxWidth = 4096, maxHeight = 4096, pot = false, square = false, pixelRatio = 1, classPrefix = "icon", classSeparator = "-" } = item
   const includeGlobs = toGlobList(item.include)
   const include = includeGlobs.length > 0 ? includeGlobs : ["**/*.{png,jpg,jpeg,webp,avif}"]
   const exclude = toGlobList(item.exclude)
@@ -238,7 +239,7 @@ export async function generateSheet(item: BitmapIconsItem): Promise<boolean> {
       }
       const sheet: IconSheetMeta = { width: bin.width, height: bin.height, pixelRatio }
       // 四类产物恒产:样式 / 脚本 / 坐标 JSON 全部生成。
-      emitStyle(stylePath, manifest, { prefix, imagePath, sheetW: bin.width, sheetH: bin.height, pixelRatio })
+      emitStyle(stylePath, manifest, { classPrefix, classSeparator, imagePath, sheetW: bin.width, sheetH: bin.height, pixelRatio })
       emitScript(scriptPath, manifest, { imagePath, stylePath, sheet })
       emitJson(jsonPath, manifest, { imagePath, sheet })
 

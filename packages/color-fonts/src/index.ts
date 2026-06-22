@@ -195,8 +195,10 @@ function configHashOf(o: ResolvedOptions): string {
       unitsPerEm: o.unitsPerEm,
       ascender: o.ascender,
       descender: o.descender,
-      baseSelector: o.baseSelector,
+      // 类命名选项:classPrefix + classSeparator(baseSelector 由二者派生);二者均影响产物类名,故都取。
+      // Class-naming options: classPrefix + classSeparator (baseSelector is derived) → hash both.
       classPrefix: o.classPrefix,
+      classSeparator: o.classSeparator,
       colorFormat: o.colorFormat,
       formats: [...o.formats].sort(),
       colrv0: o.colrv0,

@@ -46,10 +46,19 @@ export interface ColorfontCommon {
   /** 默认按 unitsPerEm 推导:asc = 0.8em, desc = -0.2em。 */
   ascender?: number
   descender?: number
-  /** 基础选择器(挂 font-family 的根 class),默认 '.icon'。 */
-  baseSelector?: string
-  /** 每图标 class 前缀,默认 'icon-'。 */
+  /**
+   * 裸词类前缀(无前导点、无尾连字符),默认 'icon'。它即 HTML 基类名 / 基类选择器主体。
+   * 由它 + classSeparator 派生:每图类名 `${classPrefix}${classSeparator}${name}`(icon-home)、
+   * 每图选择器 `.${classPrefix}${classSeparator}${name}`(.icon-home)、基类选择器 `.${classPrefix}`(.icon)。
+   * Bare-word class prefix (no leading dot, no trailing hyphen), default 'icon'. It is the HTML base
+   * class name. Combined with classSeparator it derives the per-icon class/selector and base selector.
+   */
   classPrefix?: string
+  /**
+   * 基类与图标名之间的分隔符,默认 '-'。例:classSeparator='__' → 类名 'icon__home'、选择器 '.icon__home'。
+   * Separator between the base prefix and the icon name, default '-' (e.g. '__' → 'icon__home').
+   */
+  classSeparator?: string
   /** 颜色策略,默认 'auto'。 */
   colorFormat?: ColorFormat
   /** 输出容器,默认 ['woff2'](所有现代浏览器支持)。如需兼容老浏览器,写 ['woff2','woff']。 */
@@ -124,8 +133,10 @@ export interface ResolvedOptions {
   unitsPerEm: number
   ascender: number
   descender: number
-  baseSelector: string
+  /** 用户选项:裸词类前缀(无前导点、无尾连字符),默认 'icon'。 / Bare-word class prefix. */
   classPrefix: string
+  /** 用户选项:基类与图标名之间的分隔符,默认 '-'。 / Separator between base prefix and icon name. */
+  classSeparator: string
   colorFormat: ColorFormat
   formats: FontFormat[]
   /** 是否生成 COLRv0 档。 */

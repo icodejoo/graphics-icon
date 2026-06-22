@@ -1,5 +1,5 @@
 {
-  "configHash": "3f793a139d9fbab4fa91684a2c81767ed07ee431c7213de9dbb5547f46525165",
+  "configHash": "a15d62d7c373b217a86e4baf4d4cfb21b96c821bb0498d771e086311490a0b73",
   "files": {
     "../color-fonts/fixtures/arrow-left.svg": "368d8f11b8808cf53f144551bce9d5667221e224efb1cec78c977950250677b4",
     "../color-fonts/fixtures/badge-grad.svg": "62299bc642267a4d82745a5cd650cb43540fe377b270bac15842ebd94607c7d4",
@@ -11,6 +11,7 @@
     "test/app/.gen/AccIcons.colrv0.woff2",
     "test/app/.gen/AccIcons.colrv1.woff2",
     "test/app/.gen/AccIcons.css",
+    "test/app/.gen/AccIcons.json",
     "test/app/.gen/AccIcons.mono.woff2",
     "test/app/.gen/AccIcons.otsvg.woff2",
     "test/app/.gen/AccIcons.ts"

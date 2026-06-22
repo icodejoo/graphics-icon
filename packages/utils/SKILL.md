@@ -19,8 +19,10 @@ description: >-
 - `./glob` — `toGlobList`、`matchesAnyGlob`:include/exclude 归一+匹配(正斜杠,兼容 Windows)。
 - `./path-rel` — `relTo(from,to)`:`url()`/`import` 相对路径。
 - `./fs-write` — `writeTextIfChanged`、`writeBufferIfChanged`:内容未变不落盘。
-- `./cache` — `groupCache`(统一管 svg/bitmap/colorfont 的多实例按项缓存)、`resolveCacheFile`、`loadCache`、`saveCache`、`pruneCache`、`CACHE_DIR`。
+- `./cache` — `groupCache`(统一管 svg/bitmap/colorfont 的多实例按项缓存)、`openPerFileCache`(imagemin 用)、`resolveCacheFile`、`loadCache`、`saveCache`、`pruneCache`、`CACHE_DIR`。
 - `./scale-svg` — `scaleSvgToWidth`(scale-that-svg 委托放大)、`normalizeSvg`(与 colorfont 对齐)。
+- `./banner` — `autoGenBanner(style)`:中英双语「该文件是自动生成的，请勿修改」头注释,`style ∈ 'line'(js/ts)|'block'(css)|'xml'(svg)`。四引擎所有文本产物(css/ts/js/svg)头部统一加;JSON 纯数据不加。
+- `./class-names` — `deriveClassNames(classPrefix, classSeparator)`:由裸词 `classPrefix`(默认 `'icon'`)+ `classSeparator`(默认 `'-'`)派生 `{ baseSelector('.icon'), baseName('icon'), className(name)→'icon-home', perSelector(name)→'.icon-home' }`。color-fonts 与 bitmap-icons **共用此单一真相**(svg 用 `<use href>` 无类名,不涉及)。
 
 ## 用法
 ```ts
