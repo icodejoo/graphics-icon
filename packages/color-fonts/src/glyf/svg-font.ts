@@ -1,4 +1,3 @@
-// @ts-expect-error svg2ttf 是 CJS 默认导出,无类型
 import svg2ttf from 'svg2ttf'
 
 import type { ResolvedOptions } from '../types.ts'

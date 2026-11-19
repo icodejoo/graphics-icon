@@ -27,3 +27,11 @@ packages/*/pkg-verify/
 
 # 基准图标语料(本地生成,可由 bench 脚本重建)
 **/.bench-icons/
+
+# 测试 / 脚本生成物(由测试重建,不入库)
+**/.cache.graphics/
+packages/exports/test/app/.gen/
+**/.used-icons-test-tmp/
+**/.render-tmp/
+**/.colorfont-test-tmp/
+packages/*/scratch/

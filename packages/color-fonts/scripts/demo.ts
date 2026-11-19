@@ -66,9 +66,8 @@ const { buildAndWrite } = await import('../src/index.ts')
 await rm(demoDir, { recursive: true, force: true })
 const t = performance.now()
 const r = await buildAndWrite({
-  input: iconsDir,
-  outDir: demoDir,
-  fontName: 'DemoIcons',
+  sources: iconsDir,
+  output: { dir: demoDir, fontName: 'DemoIcons', name: 'DemoIcons' },
   colorFormat: 'colrv1',
   formats: ['woff2', 'woff'],
 })

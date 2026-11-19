@@ -15,16 +15,16 @@ function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error('ASSERT FAILED: ' + msg)
 }
 
-const o = resolveOptions({ input: fixtures, outDir: resolve(here, '../.c1-out'), fontName: 'C1', colorFormat: 'colrv1', formats: ['woff2'] })
-const icons = await loadIcons(o.input)
+const o = resolveOptions({ sources: fixtures, output: { dir: resolve(here, '../.c1-out'), fontName: 'C1', name: 'C1' }, colorFormat: 'colrv1', formats: ['woff2'] })
+const icons = await loadIcons(o.sources)
 
-const inputs = icons.map((ic, i) => prepareOne({ name: ic.name, svg: ic.svg, codepoint: 0xe000 + i }, o))
+const inputs = await Promise.all(icons.map((ic, i) => prepareOne({ name: ic.name, svg: ic.svg, codepoint: 0xe000 + i }, o)))
 
 const { baseSfnt, doc } = buildColrv1(inputs, o)
 
 // 解析 base 字体;名称 → baseGlyphId 经 cmap(码位 0xE000+i)取真实 gid。
 // 注意:glyf 引擎「层字形优先 + svg2ttf 去重」使 gid 不再是输入顺序的 1..5,必须经 cmap 解析。
-const font = opentype.parse(baseSfnt.buffer.slice(baseSfnt.byteOffset, baseSfnt.byteOffset + baseSfnt.byteLength))
+const font = opentype.parse(baseSfnt.buffer.slice(baseSfnt.byteOffset, baseSfnt.byteOffset + baseSfnt.byteLength) as ArrayBuffer)
 const baseIdByName = new Map<string, number>()
 inputs.forEach((ic, i) => baseIdByName.set(ic.name, font.charToGlyphIndex(String.fromCodePoint(0xe000 + i))))
 

@@ -15,9 +15,8 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 const result = await buildAndWrite({
-  input: fixtures,
-  outDir: out,
-  fontName: 'SmokeIcons',
+  sources: fixtures,
+  output: { dir: out, fontName: 'SmokeIcons', name: 'SmokeIcons' },
   formats: ['woff2', 'woff', 'ttf'],
   colorFormat: 'auto',
 })

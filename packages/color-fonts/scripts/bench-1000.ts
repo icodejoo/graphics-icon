@@ -83,7 +83,7 @@ async function bench(label: string, colorFormat: string, env?: string) {
   if (env) process.env.COLORFONT_COLRV1_WASM = env
   else delete process.env.COLORFONT_COLRV1_WASM
   const t = performance.now()
-  const r = await build({ input: iconsDir, outDir, fontName: 'Bench', colorFormat: colorFormat as never, formats: ['woff2'] })
+  const r = await build({ sources: iconsDir, output: { dir: outDir, fontName: 'Bench', name: 'Bench' }, colorFormat: colorFormat as never, formats: ['woff2'] })
   const ms = performance.now() - t
   const flavors = [...new Set(r.assets.map((a) => a.color))]
   const totalKB = (r.assets.reduce((s, a) => s + a.source.length, 0) / 1024).toFixed(0)

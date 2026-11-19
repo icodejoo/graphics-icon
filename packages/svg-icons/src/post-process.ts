@@ -31,7 +31,7 @@ import { normalizeSvg } from "@codejoo/utils/scale-svg"
 
 import { scopeIconIds } from "./scope-ids.ts"
 
-import type { ColorOption, NormalizeOption } from "./types.ts"
+import type { ColorFn, ColorOption, NormalizeOption } from "./types.ts"
 
 // 仅匹配「真正的颜色属性」；url(#..) 引用、none、currentColor 在替换时跳过
 const COLOR_ATTR = /\b(fill|stroke|stop-color)="([^"]+)"/g

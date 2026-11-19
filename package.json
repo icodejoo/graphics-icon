@@ -4,7 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "test": "pnpm -r test"
+    "build": "pnpm --filter \"!graphics-icon\" -r build && pnpm --filter graphics-icon build",
+    "typecheck": "pnpm -r exec tsc --noEmit -p .",
+    "test": "pnpm build && pnpm -r test"
   },
   "description": "High-performance, full-featured graphics build toolkit (pnpm monorepo): SVG icons -> color webfont (colorfont), bitmap sprite sheets, image compression (imagemin), and SVG symbol sprites - sharing one utils submodule, one cache folder, and on-demand modular loading.",
   "keywords": [
@@ -37,5 +39,8 @@
     "svg-sprite",
     "svg-symbol",
     "build-cache"
-  ]
+  ],
+  "engines": {
+    "node": ">=24"
+  }
 }

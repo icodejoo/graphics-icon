@@ -10,9 +10,8 @@ function assert(c: unknown, m: string): asserts c {
 }
 
 const result = await build({
-  input: resolve(here, '../fixtures'),
-  outDir: resolve(here, '../.c1-degrade-out'),
-  fontName: 'Deg',
+  sources: resolve(here, '../fixtures'),
+  output: { dir: resolve(here, '../.c1-degrade-out'), fontName: 'Deg', name: 'Deg' },
   colorFormat: 'colrv1',
   formats: ['woff2'],
 })

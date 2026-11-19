@@ -34,9 +34,8 @@ function tableDir(buf: Uint8Array): Map<string, { offset: number; length: number
 }
 
 const result = await build({
-  input: resolve(here, '../fixtures'),
-  outDir: resolve(here, '../.c1-e2e-out'),
-  fontName: 'C1e2e',
+  sources: resolve(here, '../fixtures'),
+  output: { dir: resolve(here, '../.c1-e2e-out'), fontName: 'C1e2e', name: 'C1e2e' },
   colorFormat: 'colrv1',
   formats: ['ttf', 'woff2'],
 })
