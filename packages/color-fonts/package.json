@@ -28,25 +28,26 @@
   ],
   "scripts": {
     "smoke": "node scripts/smoke.ts",
-    "test": "node --experimental-strip-types test/cli.test.ts && node --experimental-strip-types colorfont.test.ts",
+    "test": "node --experimental-strip-types test/cli.test.ts && node --experimental-strip-types colorfont.test.ts && node --experimental-strip-types test/stroke.test.ts",
     "build": "tsup && node scripts/copy-wasm.mjs"
   },
   "dependencies": {
     "@codejoo/utils": "workspace:*",
     "cubic2quad": "^1.2.1",
     "opentype.js": "^2.0.0",
+    "pathkit-wasm": "1.0.0",
+    "scale-that-svg": "catalog:",
     "svg2ttf": "^6.1.0",
     "svgo": "catalog:",
     "svgpath": "catalog:",
-    "scale-that-svg": "catalog:",
     "ttf2woff": "^3.0.0"
   },
   "devDependencies": {
-    "@0x6b/ttf2woff2-wasm": "^0.13.1",
-    "@types/node": "^24.0.0",
+    "@0x6b/ttf2woff2-wasm": "^0.14.1",
+    "@types/node": "^26.6.6",
     "svgicons2svgfont": "^16.0.0",
-    "typescript": "^5.6.0",
-    "tsup": "^8.0.0"
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts"

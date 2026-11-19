@@ -2,6 +2,7 @@
 // 产出 PreparedIcon 供所有写表器直接消费,消除各档重复 toOutline(colrv0/colrv1 慢的根因)。
 import { normalizeSvg } from '@codejoo/utils/scale-svg'
 
+import { outlineStrokes } from '../outline/stroke.ts'
 import { toOutline } from '../outline/to-outline.ts'
 import { detectColor } from './detect-color.ts'
 import { getSvgInner, parseSvg } from '../util/svg.ts'
@@ -45,7 +46,8 @@ export interface RawIcon {
 // 归一化(normalizeSvg)复用 @codejoo/utils/scale-svg(与本引擎同策略,惰性加载 svgo/svgpath),故为 async。
 /** 处理单个图标:规范化 + 解析 + 检测 + base/层轮廓。可在主线程或 worker 调用。 */
 export async function prepareOne(raw: RawIcon, o: ResolvedOptions): Promise<PreparedIcon> {
-  const norm = await normalizeSvg(raw.svg)
+  // 描边图标(Lucide 等)先在原始坐标系展开成填充轮廓,再归一化;无描边的图标原样通过
+  const norm = await normalizeSvg(await outlineStrokes(raw.svg))
   const { viewBox, paths } = parseSvg(norm)
   const plan = detectColor(paths)
   const base = toOutline(plan.allDs, viewBox, o)

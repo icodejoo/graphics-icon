@@ -1,6 +1,6 @@
 // 发布产物验收:加载已构建的 dist/vite.js(伞插件,引擎已内联),真实 vite build,
 // colorFormat:'colrv1' —— 验证随包的相对 wasm 能产出 colrv1 字体(实物落盘到 outDir)。
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { build as viteBuild } from 'vite'
 
 import graphicsIcon from '../dist/vite.js'
+import usedIcons from '../dist/used-icons.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(here, 'app')
@@ -50,4 +51,4 @@ assert(flavors.has('colrv0'), 'colrv0 字体')
 assert(flavors.has('otsvg'), 'otsvg 字体')
 assert(flavors.has('colrv1'), '★ colrv1 字体(发布产物内联 core + 相对 wasm 全通)')
 
-console.log('\n✅ DIST ACCEPTANCE OK(发布形态 dist/vite.js 经真实 vite build 实物落盘四档含 colrv1)')
+console.log('\n✅ DIST ACCEPTANCE OK(发布形态 dist/vite.js 经真实 vite build 实物落盘四档含 colrv1;dist/used-icons.js 按用到的图标出字体)')

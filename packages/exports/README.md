@@ -17,6 +17,7 @@ The package has **subpath exports only** (no bare `.`):
 | `graphics-icon/bitmap` | bitmap engine: `bitmapIcons` · `runCli` + types | no |
 | `graphics-icon/imagemin` | imagemin engine: `imagemin` · `defaultOptions` · `runCli` + types | no |
 | `graphics-icon/unused` | unused-file engine: `removeUnused` · `findUnused` · `runCli` + types | no |
+| `graphics-icon/used-icons` | Vite plugin: pack **only the icons you import** (Lucide or any Iconify collection) into one webfont | yes (peer) |
 
 Plus 5 CLI bins: **`color-fonts`** · **`svg-icons`** · **`bitmap-icons`** · **`image-min`** · **`remove-unused`**.
 
@@ -323,6 +324,39 @@ Deletion (`removeUnused` / `remove-unused`) takes its own `include`/`exclude` gl
 
 ---
 
+## used-icons — write the class, get the icon (Vite plugin)
+
+`graphics-icon/used-icons` scans your code for icon class names and packs **only those icons** into one webfont, taken from an Iconify collection you installed (`@iconify-json/lucide`, `@iconify-json/tabler`, …). The stylesheet is virtual — nothing is written to disk by dev or build.
+
+```ts
+// vite.config.ts
+import usedIcons from 'graphics-icon/used-icons'
+export default defineConfig({
+  plugins: [usedIcons([{ collect: 'lucide', iconPrefix: 'lucide-' }])],
+})
+```
+
+```ts
+// main.ts — once
+import 'virtual:used-icons.css'
+```
+
+```html
+<i class="lucide-sun"></i>   <!-- class = iconPrefix + icon name -->
+```
+
+- **The first argument is an array of icon sets** `{ collect, iconPrefix }`, so several libraries go side by side: `usedIcons([{ collect: 'lucide' }, { collect: 'tabler', iconPrefix: 'tb-' }])`. `collect` is the collection (`@iconify-json/<collect>`); `iconPrefix` is the class prefix and defaults to `<collect>-`. They are independent: `{ collect: 'lucide', iconPrefix: 'i-' }` makes `i-sun` the Lucide sun. Prefixes must differ. Omit the array to use every `@iconify-json/*` in your package.json (or lucide if none). Shared options go in the second argument.
+- **Dev**: every source file is scanned as it is transformed; new icons are added, the font is rebuilt (woff2 q9) and the stylesheet hot-updates. Icons you stop using stay until the dev server restarts.
+- **Build**: the final JS chunks and HTML are scanned, so only class names that **actually ship** are packed (plus `safelist` and `include` files). A font smaller than `inlineLimit` (default 16 KB) is inlined into the CSS as a `data:` URI (no extra request, no font flash; needs CSP `font-src data:`); a larger one is emitted as a separate hashed `.woff2` with a `<link rel="preload" crossorigin>` injected into the HTML, so it caches independently of the CSS. `base: './'` is handled. SSR builds are skipped.
+- **Stroke icons** (Lucide / Feather / Tabler) are outlined automatically (Skia PathOps via `pathkit-wasm`), so glyphs match the SVGs and closed shapes keep their holes.
+- **Editor hints**: when the dev server starts it writes `.vscode/used-icons.html-data.json` (only if the content changed), VS Code HTML custom data listing every icon of the configured collections. Enable it once in `.vscode/settings.json`: `"html.customData": ["./.vscode/used-icons.html-data.json"]`, then typing `class="lucide-` lists the names. (The file is verified; the completion UI is not tested here, and Vue templates depend on your Vue extension honouring `html.customData`.) Path via `customData`, `false` to disable.
+- **Local SVG folder as a collection**: `{ collect: 'brand', iconPrefix: 'brand-', dir: 'src/icons' }` — every `.svg` is an icon named after its file (`Brand Logo.svg` → `brand-logo`); edits / additions / removals hot-update in dev.
+- Shared options (2nd argument): `safelist` (full class names built at runtime; `*` wildcard, e.g. `'lucide-arrow-*'`), `include` (extra globs scanned outside the module graph — CMS JSON, backend templates; watched in dev), `warn` (dev warning for a class that has the right prefix but no such icon; off by default because package names like `lucide-react` look the same), `extraProperties` (extra CSS on icon classes; defaults give `inline-block`, `line-height: 1`, `vertical-align: -0.125em`, font style/weight reset; `''` removes a property), `scale` (size in em, default 1), `inlineLimit`, `fontName` (`UsedIcons`), `colorFormat` (`mono`; `auto` for multicolor sets), `woff2Quality` (11 in build, 9 in dev).
+- **Accessibility**: glyphs are emitted with CSS alt text — `content: "\e000"; content: "\e000" / "";` — so supporting browsers treat decorative icons as empty for screen readers (others ignore the second declaration). For an icon that carries meaning, put `aria-label` / visually hidden text on its element; for a decorative one `aria-hidden="true"` is still the most reliable.
+- **Misconfiguration fails at startup**: a collection that is not installed, or two sets with the same `iconPrefix`, throws immediately instead of silently matching nothing.
+- **Font vs CSS-mask icons**: UnoCSS `preset-icons` and the Iconify Tailwind plugin render icons as CSS `mask-image` / `background` SVGs (works for multicolor, no font). This plugin is the font route: one tiny cacheable file for all icons, scales and inherits text color/size like text, honours forced-colors mode. Pick CSS masks if you need many multicolor icons.
+- Limits: class names assembled at runtime need the `safelist`; `stroke-dasharray` and `transform` on stroked paths are not supported. A word is only an icon if it starts with a configured prefix and the icon exists, so look-alikes (`my-lucide-box`, `lucide-nothing`) are ignored.
+
 ## Standalone (no Vite)
 
 Import each engine from its subpath:
@@ -415,6 +449,7 @@ MIT
 | `graphics-icon/bitmap` | bitmap 引擎：`bitmapIcons`/`runCli` + 类型 | 否 |
 | `graphics-icon/imagemin` | imagemin 引擎：`imagemin`/`defaultOptions`/`runCli` + 类型 | 否 |
 | `graphics-icon/unused` | 无用文件引擎：`removeUnused`/`findUnused`/`runCli` + 类型 | 否 |
+| `graphics-icon/used-icons` | Vite 插件：**只把你 import 的图标**（Lucide 等任意 Iconify 图标集）打成一个 webfont | 是（peer） |
 
 另含 5 个 CLI：**`color-fonts`** · **`svg-icons`** · **`bitmap-icons`** · **`image-min`** · **`remove-unused`**。
 
@@ -598,6 +633,39 @@ import './sprites/sheet'   // {name} 脚本 —— 注入 CSS + 解析图集图
 ```
 
 不想用脚本时则直接 import 生成的样式（`import './sprites/sheet.css'`）—— 但此时图集图 URL 由 Vite 相对该 CSS 解析，这正是 script 入口替你处理的。
+
+## used-icons —— 写类名就有图标（Vite 插件）
+
+`graphics-icon/used-icons` 扫描代码里的图标类名，**只把用到的图标**打成一个 webfont，图标来自你装的 Iconify 图标集（`@iconify-json/lucide`、`@iconify-json/tabler`……）。样式是虚拟模块，开发与构建都不往磁盘写样式或字体。
+
+```ts
+// vite.config.ts
+import usedIcons from 'graphics-icon/used-icons'
+export default defineConfig({
+  plugins: [usedIcons([{ collect: 'lucide', iconPrefix: 'lucide-' }])],
+})
+```
+
+```ts
+// main.ts —— 入口 import 一次样式
+import 'virtual:used-icons.css'
+```
+
+```html
+<i class="lucide-sun"></i>   <!-- 类名 = iconPrefix + 图标名 -->
+```
+
+- **第一个参数是图标集数组** `{ collect, iconPrefix }`，多个库并排写：`usedIcons([{ collect: 'lucide' }, { collect: 'tabler', iconPrefix: 'tb-' }])`。`collect` 是图标集（`@iconify-json/<collect>`）；`iconPrefix` 是类名前缀，默认 `<collect>-`。两者互相独立：`{ collect: 'lucide', iconPrefix: 'i-' }` 时 `i-sun` 就是 Lucide 的 sun；各前缀不能相同。数组省略时，用 package.json 里装的全部 `@iconify-json/*`（一个都没装则用 lucide）。共用选项写在第二个参数。
+- **开发**：每个源文件在被转换时扫描类名，发现新图标就加进字体、重新出字体（woff2 q9）并热更新样式；不再使用的图标要重启 dev server 才会清掉。
+- **构建**：扫描最终的 JS chunk 与 HTML，只收**真正会发布**的类名（再加 `safelist` 与 `include` 文件）。字体小于 `inlineLimit`（默认 16 KB）就以 `data:` URI 内联进 CSS（少一次请求、不会闪烁；CSP 需允许 `font-src data:`）；更大则单独输出带哈希的 `.woff2`，并在 HTML 里注入 `<link rel="preload" crossorigin>`，缓存独立于 CSS。`base: './'` 已处理；SSR 构建会跳过。
+- **描边图标**（Lucide / Feather / Tabler）自动展开成填充轮廓（Skia PathOps，经 `pathkit-wasm`），字形与 SVG 一致，闭合图形的孔不会被填满。
+- **编辑器提示**：开发服务器启动时写出 `.vscode/used-icons.html-data.json`（内容没变不重写），是 VS Code 的 HTML 自定义数据，列出所配图标集的全部图标。需在 `.vscode/settings.json` 里开一次：`"html.customData": ["./.vscode/used-icons.html-data.json"]`，之后 `class="lucide-` 敲到一半就列出图标名。（文件生成已验证；编辑器里的补全界面本仓库没有实测，Vue 模板能否生效取决于你的 Vue 扩展是否读取 `html.customData`。）路径用 `customData` 改，`false` 关闭。
+- **本地 SVG 目录当图标集**：`{ collect: 'brand', iconPrefix: 'brand-', dir: 'src/icons' }`——目录里每个 `.svg` 是一个图标，图标名取文件名（`Brand Logo.svg` → `brand-logo`）；开发期改动 / 新增 / 删除会热更新。
+- 共用选项（第二个参数）：`safelist`（运行时才拼出来的完整类名；支持 `*` 通配，如 `'lucide-arrow-*'`）、`include`（额外扫描、不经过模块图的文件 glob，如 CMS 导出的 JSON、后端模板；开发期监听）、`warn`（前缀对但图标不存在时在开发期警告；默认关，因为 `lucide-react` 这类包名长得一样）、`extraProperties`（图标类的附加 CSS；默认给 `inline-block`、`line-height: 1`、`vertical-align: -0.125em` 与字体样式 / 粗细复位；值为 `''` 则去掉）、`scale`（大小，单位 em，默认 1）、`inlineLimit`、`fontName`（`UsedIcons`）、`colorFormat`（`mono`；彩色图标集用 `auto`）、`woff2Quality`（构建 11、开发 9）。
+- **无障碍**：字形用 CSS 替代文本输出——`content: "\e000"; content: "\e000" / "";`——支持的浏览器会把装饰性图标当空内容，读屏软件跳过（不支持的浏览器忽略第二条）。有含义的图标请在它的元素上写 `aria-label` / 视觉隐藏文本；装饰性图标写 `aria-hidden="true"` 仍然最稳。
+- **配置写错启动就报**：图标集没装、或两个图标集 `iconPrefix` 相同，会立刻抛错，而不是悄悄什么都匹配不到。
+- **字体 vs CSS mask 图标**：UnoCSS `preset-icons`、Iconify 的 Tailwind 插件把图标渲染成 CSS `mask-image` / `background` 的 SVG（支持多色、不需要字体）。本插件走字体路线：所有图标共用一个很小、可缓存的文件，像文字一样随字号和文字颜色缩放，并遵循强制颜色模式。需要大量多色图标时选 CSS mask。
+- 限制：运行时拼接的类名要进 `safelist`；描边路径上的 `stroke-dasharray` 与 `transform` 不支持。一个词必须以所配前缀开头且图标真实存在才算图标，所以长得像的（`my-lucide-box`、`lucide-nothing`）会被忽略。
 
 ## 独立使用（Vite 之外）
 

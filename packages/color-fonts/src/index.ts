@@ -16,6 +16,7 @@ import { prepareIcons } from './pipeline/prepare-icons.ts'
 import type {
   BuildResult,
   BuildWarning,
+  CodepointMap,
   ColorFormat,
   ColorfontItem,
   ColorfontOptions,
@@ -99,6 +100,23 @@ function resolveFlavors(cf: ColorFormat, anyColor: boolean): { flavors: FontFlav
 export async function build(options: ColorfontItem, preloaded?: Map<string, string>): Promise<BuildResult> {
   const o = resolveOptions(options)
   const icons = await loadIcons(o.sources, preloaded)
+  return buildIcons(o, icons, await readLockfile(o.codepointsFile, o.paStart))
+}
+
+/**
+ * 内存版构建:图标直接以 `{ name, svg }` 传入,不读源目录、不读写码位锁(码位每次从 PUA 起点按名字序重新分配,
+ * 字体与 CSS 同次产出所以一致)。给「按用到的图标动态出字体」的场景用(虚拟模块 / 开发服务器)。
+ * `output.dir` 在此不使用,可传占位。
+ * In-memory build: icons passed as `{ name, svg }`; no source dir, no codepoint lock file. For on-demand font generation.
+ */
+export async function buildFromIcons(options: Omit<ColorfontItem, 'sources'>, icons: { name: string; svg: string }[]): Promise<BuildResult> {
+  const o = resolveOptions({ ...options, sources: [] })
+  const sorted = [...icons].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+  return buildIcons(o, sorted, { version: 1, paFirst: o.paStart, glyphs: {} })
+}
+
+/** build 的核心:已加载的图标 + 码位锁 → 产物。 */
+async function buildIcons(o: ResolvedOptions, icons: { name: string; svg: string }[], lock: CodepointMap): Promise<BuildResult> {
 
   // 空输入即视为失败:静默产出空字体几乎总是误配(输入路径错/目录空)。
   // 抛出后经 buildAndWrite→colorfonts runner 的 try/catch 按 throwable 处理(默认抛、false 告警);
@@ -112,7 +130,6 @@ export async function build(options: ColorfontItem, preloaded?: Map<string, stri
     )
   }
 
-  const lock = await readLockfile(o.codepointsFile, o.paStart)
   const cpMap = assignCodepoints(
     icons.map((i) => i.name),
     lock,
@@ -321,3 +338,4 @@ export type {
   FontMetadata,
   GlyphMeta,
 } from './types.ts'
+export type { RawIcon as BuildIcon } from './pipeline/load-icons.ts'

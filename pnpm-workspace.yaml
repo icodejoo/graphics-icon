@@ -5,12 +5,12 @@ packages:
 # Shared common dependency versions: packages reference them via "catalog:" for single-point upgrades.
 catalog:
   # 通用 / common
-  svgo: ^4.0.0
+  svgo: ^4.1.0
   svgpath: ^2.6.0
   scale-that-svg: ^1.0.6
-  vite: ^8.0.0
+  vite: ^8.3.8
   # 位图 / bitmap (bitmap-sprite, imagemin)
-  sharp: ^0.35.1
-  maxrects-packer: ^2.7.3
+  sharp: ^0.35.5
+  maxrects-packer: ^3.0.0
   # svg sprite
   vite-plugin-icons-spritesheet: ^3.1.0

@@ -2,12 +2,12 @@
 name: colorfont-plugin
 description: >-
   graphics-icon monorepo(伞插件 colorfont + bitmap-icons + svg-icons + imagemin)的整体架构、
-  colorfont 引擎的关键选型抉择与实测结果。在 D:\workspaces\colorfont 上工作(改引擎/写表/wasm/打包/性能/伞层)时参考本 skill。
+  colorfont 引擎的关键选型抉择与实测结果。在 E:\workspaces\codejoo\graphics-icon 上工作(改引擎/写表/wasm/打包/性能/伞层)时参考本 skill。
 ---
 
 # graphics-icon monorepo —— 总览 / colorfont 引擎选型 / 实测
 
-`D:\workspaces\colorfont` 是独立 pnpm monorepo(不在 let188 仓库)。对外**唯一发布物**是 `graphics-icon`(在
+`E:\workspaces\codejoo\graphics-icon` 是独立 pnpm monorepo(不在 let188 仓库)。对外**唯一发布物**是 `graphics-icon`(在
 `packages/exports`),它**仅有子路径导出**(无裸 `.`),把四个引擎合成一个 Vite 插件 + 暴露各引擎函数;其余包均
 `private`,经 tsup `noExternal` 内联进 `packages/exports` 的 dist。
 
@@ -21,6 +21,7 @@ description: >-
 - `svg-icons` —— SVG 雪碧图引擎(`svgIcons`)+ 内部插件工厂。
 - `@codejoo/imagemin` —— 图片压缩引擎(`imagemin`)+ CLI。
 - `unused`(**packages/unused**)—— 无用**文件**检测(不限资产,`ext`/`include` 任意后缀)→ 写清单表,删除分离。两后端:`unusedVite`(模块图,`apply:'build'`,走 vite,代码可达性更准)与 `findUnused`/`remove-unused --scan`(静态扫描,不依赖 vite)。`removeUnused`/`remove-unused` 读表删除,带 `include`/`exclude` 安全闸(`dryRun` 仅打印)。经伞插件 `unused` 键集成时自动排除四引擎的输入/输出。
+- `used-icons`(**packages/used-icons**)—— 独立 Vite 插件(经 `graphics-icon/used-icons` 导出,不进伞插件:伞的钩子多路复用丢弃 `load` 返回值,承载不了虚拟模块):扫描类名 = `iconPrefix` + 图标名(第一个参数是 `{collect, iconPrefix}[]`,前缀默认 `<collect>-`,与集合名解耦;省略则取 package.json 里的 `@iconify-json/*`;共用选项在第二个参数),只把用到的图标出一个 webfont。虚拟模块只有 `virtual:used-icons.css`;开发期在 `transform`(pre)与 `transformIndexHtml` 里扫源码、登记并防抖 `reloadModule`;构建期放占位规则,`generateBundle`(order:'post',等 Vite 发射 HTML 之后)扫最终 JS chunk 与 HTML 里的类名,整条替换占位(字体 data URI 内联)。类规则由插件自己按类名写(引擎只取 @font-face);开发服务器启动时写 `.vscode/used-icons.html-data.json`(VS Code class 值提示;不再生成 d.ts,`virtual:used-icons.css` 的类型在 `graphics-icon/used-icons/client`)。字体走 color-fonts 的内存版 `buildFromIcons`;描边图标由引擎 `outline/stroke.ts`(pathkit-wasm 的 stroke + simplify,再 `fixWinding` 统一轮廓方向)展开。
 - `@codejoo/utils` —— 内部公共子模块(hash/fingerprint/glob/path-rel/fs-write/cache(含统一 `groupCache`)/scale-svg)。
 - colorfont 内含两个 Rust→wasm crate:`colrv1-writer`(COLRv1 写表)、`woff2`(可调质量 woff2 编码,ttf2woff2)。
 

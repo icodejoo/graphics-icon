@@ -1,8 +1,8 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  // 6 个子路径出口 + 5 个 CLI bin。
-  // /vite = 伞插件(@graphics-icon/vite-umbrella);/bitmap·/svg·/imagemin·/colorfont·/unused = 各引擎(引擎函数 + runCli + 类型)。
+  // 7 个子路径出口 + 5 个 CLI bin。
+  // /vite = 伞插件(@graphics-icon/vite-umbrella);/bitmap·/svg·/imagemin·/colorfont·/unused = 各引擎(引擎函数 + runCli + 类型);/used-icons = 按用到的图标出字体的独立 Vite 插件。
   entry: [
     'src/vite.ts',
     'src/bitmap.ts',
@@ -10,6 +10,7 @@ export default defineConfig({
     'src/imagemin.ts',
     'src/colorfont.ts',
     'src/unused.ts',
+    'src/used-icons.ts',
     'src/bin.ts',
     'src/bin-bitmap.ts',
     'src/bin-svg.ts',
@@ -36,6 +37,6 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   // 把伞插件 + 引擎 + utils 的源/产物内联进本包(自包含);vite 作为 peer 保持 external。
-  noExternal: ['@graphics-icon/vite-umbrella', 'color-fonts', 'bitmap-icons', 'svg-icons', '@codejoo/imagemin', 'unused', '@codejoo/utils'],
+  noExternal: ['@graphics-icon/vite-umbrella', 'color-fonts', 'bitmap-icons', 'svg-icons', '@codejoo/imagemin', 'unused', 'used-icons', '@codejoo/utils'],
   external: ['vite'],
 })

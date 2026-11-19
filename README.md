@@ -10,7 +10,7 @@
 pnpm install graphics-icon
 ```
 
-发布包 `graphics-icon` 在 [`packages/exports`](packages/exports)。它**仅有子路径导出**(无裸 `.`):`graphics-icon/vite`(伞插件)、`graphics-icon/colorfont`、`graphics-icon/svg`、`graphics-icon/bitmap`、`graphics-icon/imagemin`,外加 5 个 CLI:`color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`。
+发布包 `graphics-icon` 在 [`packages/exports`](packages/exports)。它**仅有子路径导出**(无裸 `.`):`graphics-icon/vite`(伞插件)、`graphics-icon/colorfont`、`graphics-icon/svg`、`graphics-icon/bitmap`、`graphics-icon/imagemin`、`graphics-icon/unused`、`graphics-icon/used-icons`(扫描类名,只打包用到的图标),外加 5 个 CLI:`color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`。
 
 ```ts
 // vite.config.ts
@@ -21,9 +21,9 @@ export default defineConfig({
   plugins: [
     graphicsIcon({
       // 每个子能力(colorfont/svgIcons/bitmapIcons)均为多实例 { ...公共, items: [...] };imagemin 为单例
-      colorfonts: { colorFormat: 'auto', items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }] },
-      svgIcons: { items: [{ input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' }, color: true }] },
-      bitmapIcons: { items: [{ inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css' } }] },
+      colorfonts: { colorFormat: 'auto', items: [{ sources: 'src/icons/color', output: { dir: 'src/fonts', fontName: 'AppIcons', name: 'AppIcons' } }] },
+      svgIcons: { items: [{ sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' }, color: 'mono' }] },
+      bitmapIcons: { items: [{ sources: 'src/icons/png', output: { dir: 'src/sprites', name: 'sheet' } }] },
       imagemin: { enabled: true },   // 构建产物图片压缩;enabled:false 可关
     }),
   ],
@@ -39,6 +39,17 @@ import './fonts/AppIcons.css'                       // @font-face + .icon 类
 import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 ```
 
+**used-icons(独立插件,不在伞插件里)**:写类名就有图标,只把用到的图标打进字体,样式是虚拟模块:
+
+```ts
+import usedIcons from 'graphics-icon/used-icons'
+plugins: [usedIcons([{ collect: 'lucide', iconPrefix: 'lucide-' }])]   // 数组:可写多个图标集
+// main.ts:  import 'virtual:used-icons.css'
+// 模板里:  <i class="lucide-sun"></i>
+```
+
+需要 `pnpm add -D @iconify-json/lucide`。选项、构建 / 开发行为、无障碍与限制见 [`packages/exports/README.md`](packages/exports/README.md);给智能体的速查见 [`AGENTS.md`](AGENTS.md)。
+
 > 完整 API——每个选项(字段、类型、默认值)、独立引擎子路径(暴露引擎函数)与 CLI——见发布包 README:[`packages/exports/README.md`](packages/exports/README.md)。
 
 ## 内部结构(均为 private)
@@ -51,6 +62,8 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 | 位图雪碧图 | `bitmap-icons`:sharp + maxrects-packer 把位图打成图集 + 自适应样式/入口脚本。 |
 | SVG 雪碧图 | `svg-icons`:`<symbol>` 雪碧图,id 作用域化、颜色主题化,可选与 colorfont 同步的 normalize。 |
 | 图片压缩 | `@codejoo/imagemin`:sharp + svgo 就地压缩引擎/CLI,内容哈希缓存 + 重命名识别。 |
+| 未使用资产 | `unused`:模块图 / 静态扫描检出无引用文件,写清单表,删除另走一步。 |
+| 按用到的图标出字体 | `used-icons`:独立 Vite 插件,扫描代码里的 `lucide-sun` 这类类名,只把用到的图标(Lucide 等 Iconify 图标集)打成一个 webfont,开发与构建都是虚拟模块;描边图标由引擎自动展开。 |
 | 公共子模块 | `@codejoo/utils`:哈希/glob/幂等写入/共享缓存原语/SVG 缩放归一化。 |
 
 ---
@@ -69,7 +82,7 @@ Bundles the common "graphic asset → shippable output" build needs into one plu
 pnpm install graphics-icon
 ```
 
-The published package `graphics-icon` lives in [`packages/exports`](packages/exports). It has **subpath exports only** (no bare `.`): `graphics-icon/vite` (umbrella plugin), `graphics-icon/colorfont`, `graphics-icon/svg`, `graphics-icon/bitmap`, `graphics-icon/imagemin`, plus 5 CLIs: `color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`.
+The published package `graphics-icon` lives in [`packages/exports`](packages/exports). It has **subpath exports only** (no bare `.`): `graphics-icon/vite` (umbrella plugin), `graphics-icon/colorfont`, `graphics-icon/svg`, `graphics-icon/bitmap`, `graphics-icon/imagemin`, `graphics-icon/unused`, `graphics-icon/used-icons` (scans class names, packs only the icons you use), plus 5 CLIs: `color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`.
 
 ```ts
 // vite.config.ts
@@ -80,9 +93,9 @@ export default defineConfig({
   plugins: [
     graphicsIcon({
       // each capability (colorfont/svgIcons/bitmapIcons) is multi-instance { ...common, items: [...] }; imagemin is a singleton
-      colorfonts: { colorFormat: 'auto', items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }] },
-      svgIcons: { items: [{ input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' }, color: true }] },
-      bitmapIcons: { items: [{ inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css' } }] },
+      colorfonts: { colorFormat: 'auto', items: [{ sources: 'src/icons/color', output: { dir: 'src/fonts', fontName: 'AppIcons', name: 'AppIcons' } }] },
+      svgIcons: { items: [{ sources: 'src/icons/svg', output: { dir: 'src/sprites', name: 'icons' }, color: 'mono' }] },
+      bitmapIcons: { items: [{ sources: 'src/icons/png', output: { dir: 'src/sprites', name: 'sheet' } }] },
       imagemin: { enabled: true },   // optimize build-output images; enabled:false to turn off
     }),
   ],
@@ -98,6 +111,17 @@ import './fonts/AppIcons.css'                       // @font-face + .icon classe
 import { icons, type IconName } from './fonts/AppIcons'  // typed API
 ```
 
+**used-icons (standalone plugin, not part of the umbrella)**: write a class, get the icon; only icons you use are packed into the font; the stylesheet is a virtual module:
+
+```ts
+import usedIcons from 'graphics-icon/used-icons'
+plugins: [usedIcons([{ collect: 'lucide', iconPrefix: 'lucide-' }])]   // an array: several icon sets allowed
+// main.ts:    import 'virtual:used-icons.css'
+// templates:  <i class="lucide-sun"></i>
+```
+
+Requires `pnpm add -D @iconify-json/lucide`. Options, build / dev behavior, accessibility and limits: [`packages/exports/README.md`](packages/exports/README.md); a quick reference for coding agents: [`AGENTS.md`](AGENTS.md).
+
 > Full API — every option (field, type, default), the standalone engine subpaths (which expose engine functions) and the CLIs — lives in the package README: [`packages/exports/README.md`](packages/exports/README.md).
 
 ### Internal structure (all private)
@@ -110,4 +134,6 @@ The published artifact `graphics-icon` is at `packages/exports`; `packages/vite-
 | Bitmap sprites | `bitmap-icons`: sharp + maxrects-packer pack bitmaps into an atlas + fluid styles / entry script. |
 | SVG sprites | `svg-icons`: `<symbol>` sprites with id scoping and color theming, plus optional normalize in sync with colorfont. |
 | Image optimization | `@codejoo/imagemin`: sharp + svgo in-place compression engine/CLI, content-hash cache + rename detection. |
+| Unused assets | `unused`: module-graph / static scan finds unreferenced files, writes a manifest; deletion is a separate step. |
+| On-demand icon font | `used-icons`: standalone Vite plugin that scans class names like `lucide-sun` and packs only the icons you use (Lucide or any Iconify collection) into one webfont; virtual modules in dev and build; stroke icons are outlined automatically. |
 | Shared submodule | `@codejoo/utils`: hash / glob / idempotent-write / shared-cache primitives / SVG scale-normalize. |

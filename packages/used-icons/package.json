@@ -1,0 +1,56 @@
+{
+  "name": "used-icons",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Vite plugin: pack only the icons your code actually imports (from any @iconify-json collection, e.g. Lucide) into one webfont. Virtual modules in dev and build, no files on disk, stroke icons are outlined automatically.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "vite-plugin",
+    "iconify",
+    "lucide",
+    "icon-font",
+    "webfont",
+    "on-demand"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/graphics-icon.git",
+    "directory": "packages/used-icons"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "color-fonts": "workspace:*",
+    "@iconify/utils": "^3.1.7"
+  },
+  "peerDependencies": {
+    "vite": "^5 || ^6 || ^7 || ^8"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.157",
+    "@iconify/types": "^2.0.0",
+    "@types/node": "^26.6.6",
+    "typescript": "^6.0.3",
+    "vite": "catalog:",
+    "tsup": "^9.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --experimental-strip-types used-icons.test.ts"
+  }
+}

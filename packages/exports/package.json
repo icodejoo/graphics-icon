@@ -18,7 +18,10 @@
     "imagemin",
     "image-optimization",
     "sharp",
-    "svgo"
+    "svgo",
+    "iconify",
+    "lucide",
+    "on-demand-icons"
   ],
   "repository": {
     "type": "git",
@@ -50,6 +53,13 @@
     "./unused": {
       "types": "./dist/unused.d.ts",
       "import": "./dist/unused.js"
+    },
+    "./used-icons": {
+      "types": "./dist/used-icons.d.ts",
+      "import": "./dist/used-icons.js"
+    },
+    "./used-icons/client": {
+      "types": "./used-icons-client.d.ts"
     }
   },
   "bin": {
@@ -61,6 +71,7 @@
   },
   "files": [
     "dist",
+    "used-icons-client.d.ts",
     "README.md"
   ],
   "scripts": {
@@ -79,7 +90,9 @@
     "scale-that-svg": "catalog:",
     "sharp": "catalog:",
     "maxrects-packer": "catalog:",
-    "vite-plugin-icons-spritesheet": "catalog:"
+    "vite-plugin-icons-spritesheet": "catalog:",
+    "pathkit-wasm": "1.0.0",
+    "@iconify/utils": "^3.1.7"
   },
   "peerDependencies": {
     "vite": "^5 || ^6 || ^7 || ^8"
@@ -97,10 +110,13 @@
     "@codejoo/imagemin": "workspace:*",
     "unused": "workspace:*",
     "@codejoo/utils": "workspace:*",
-    "tsup": "^8.0.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^24.0.0",
-    "vite": "catalog:"
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3",
+    "@types/node": "^26.6.6",
+    "vite": "catalog:",
+    "used-icons": "workspace:*",
+    "@iconify/types": "^2.0.0",
+    "@iconify-json/lucide": "^1.2.157"
   },
   "publishConfig": {
     "access": "public"
